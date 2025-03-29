@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-multipart
+jinja2
+aiofiles
+itsdangerous
+python-dotenv
+requests
+httpx
+starlette
+fastapi[all]
