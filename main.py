@@ -9,9 +9,9 @@ app = FastAPI()
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permitir todos los orígenes durante el desarrollo
+    allow_origins=["https://daw-frontend.vercel.app", "https://vercel.live"],  # Orígenes específicos
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,  # Tiempo máximo de caché para las respuestas preflight
