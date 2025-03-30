@@ -18,3 +18,4 @@ azure-storage-blob==12.19.0
 resemblyzer==0.1.4
 librosa==0.10.1
 numpy==1.26.2
+PyJWT==2.8.0
