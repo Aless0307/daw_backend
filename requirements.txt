@@ -9,3 +9,8 @@ requests
 httpx
 starlette
 fastapi[all]
+passlib[bcrypt]
+python-jose[cryptography]
+pydantic
+neo4j
+email-validator
