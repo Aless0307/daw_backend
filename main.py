@@ -14,8 +14,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["*"],
-    max_age=3600,  # Tiempo máximo de caché para las respuestas preflight
-    supports_credentials=True  # Importante para cookies
+    max_age=3600  # Tiempo máximo de caché para las respuestas preflight
 )
 
 # Incluir rutas de autenticación
