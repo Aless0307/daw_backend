@@ -10,6 +10,12 @@ from neo4j import GraphDatabase
 import numpy as np
 from azure_storage import upload_voice_recording
 from voice_processing import extract_voice_embedding
+import tempfile
+from resemblyzer import preprocess_wav, VoiceEncoder
+from config import (
+    SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES,
+    NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
+)
 
 load_dotenv()
 
@@ -172,65 +178,114 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     }
 
 @router.post("/login-voice")
-async def login_voice(voice: UploadFile = File(...)):
+async def login_with_voice(
+    audio: UploadFile = File(...),
+    email: str = Form(...)
+):
     try:
         # Guardar el archivo temporalmente
-        temp_path = f"temp_{voice.filename}"
-        with open(temp_path, "wb") as buffer:
-            content = await voice.read()
-            buffer.write(content)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+            content = await audio.read()
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+
+        # Procesar el archivo de voz
+        print("Procesando archivo de voz...")
+        wav = preprocess_wav(temp_file_path)
+        
+        # Cargar el modelo de codificación de voz
+        print("Cargando modelo de codificación de voz...")
+        encoder = VoiceEncoder()
+        print("Modelo cargado")
 
         # Extraer el embedding de voz
-        voice_embedding = extract_voice_embedding(temp_path)
-        
+        print("Extrayendo embedding de voz...")
+        embedding = encoder.embed_utterance(wav)
+        print("Embedding de voz extraído correctamente")
+
         # Eliminar el archivo temporal
-        os.remove(temp_path)
+        os.unlink(temp_file_path)
+
+        # Conectar a Neo4j
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
         
-        # Buscar usuario con embedding similar
         with driver.session() as session:
+            # Buscar el usuario por email
             result = session.run(
-                """
-                MATCH (u:User)
-                WHERE u.voice_embedding IS NOT NULL
-                RETURN elementId(u) as id, u
-                """
+                "MATCH (u:User {email: $email}) RETURN u",
+                email=email
             )
+            user = result.single()
             
-            best_match = None
-            best_similarity = 0
-            
-            for record in result:
-                stored_embedding = np.array(record["u"]["voice_embedding"])
-                similarity = np.dot(voice_embedding, stored_embedding) / (
-                    np.linalg.norm(voice_embedding) * np.linalg.norm(stored_embedding)
-                )
-                
-                if similarity > best_similarity:
-                    best_similarity = similarity
-                    best_match = record
-            
-            if best_match and best_similarity >= 0.7:  # Umbral de similitud
-                access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-                access_token = create_access_token(
-                    data={"sub": best_match["u"]["email"], "id": best_match["id"]},
-                    expires_delta=access_token_expires
-                )
-                
-                return {
-                    "access_token": access_token,
-                    "token_type": "bearer",
-                    "username": best_match["u"]["username"],
-                    "email": best_match["u"]["email"],
-                    "user_id": best_match["id"]
-                }
-            else:
+            if not user:
                 raise HTTPException(
                     status_code=401,
-                    detail="No se encontró una coincidencia de voz válida"
+                    detail="Usuario no encontrado"
                 )
-                
+
+            # Obtener el embedding guardado
+            stored_embedding = user["u"].get("voice_embedding")
+            if not stored_embedding:
+                raise HTTPException(
+                    status_code=401,
+                    detail="No se encontró una grabación de voz para este usuario"
+                )
+
+            # Convertir el embedding almacenado a numpy array
+            try:
+                # Si el embedding está almacenado como string
+                if isinstance(stored_embedding, str):
+                    stored_embedding = np.array(eval(stored_embedding))
+                # Si ya es una lista
+                elif isinstance(stored_embedding, list):
+                    stored_embedding = np.array(stored_embedding)
+                else:
+                    raise ValueError("Formato de embedding no válido")
+            except Exception as e:
+                print(f"Error al procesar el embedding almacenado: {str(e)}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Error al procesar la grabación de voz almacenada"
+                )
+
+            # Calcular la similitud entre los embeddings
+            similarity = np.dot(embedding, stored_embedding) / (np.linalg.norm(embedding) * np.linalg.norm(stored_embedding))
+            print(f"Similitud calculada: {similarity}")
+            
+            # Definir un umbral de similitud más bajo para desarrollo
+            SIMILARITY_THRESHOLD = 0.75  # Reducido de 0.85 a 0.75
+            
+            if similarity < SIMILARITY_THRESHOLD:
+                print(f"Similitud ({similarity:.4f}) por debajo del umbral ({SIMILARITY_THRESHOLD})")
+                raise HTTPException(
+                    status_code=401,
+                    detail=f"La voz no coincide con la grabación registrada (similitud: {similarity:.4f})"
+                )
+
+            print(f"Autenticación exitosa con similitud: {similarity:.4f}")
+
+            # Crear el token de acceso
+            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+                data={"sub": user["u"]["email"]},
+                expires_delta=access_token_expires
+            )
+
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "user": {
+                    "email": user["u"]["email"],
+                    "username": user["u"]["username"]
+                }
+            }
+
     except Exception as e:
+        print(f"Error en login con voz: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Error al procesar la grabación de voz: {str(e)}"
-        ) 
+            detail=f"Error al procesar la autenticación por voz: {str(e)}"
+        )
+    finally:
+        if 'driver' in locals():
+            driver.close() 
