@@ -13,7 +13,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
+    expose_headers=["*"],
+    max_age=3600,  # Tiempo máximo de caché para las respuestas preflight
+    supports_credentials=True  # Importante para cookies
 )
 
 # Incluir rutas de autenticación
