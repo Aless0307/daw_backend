@@ -1,8 +1,10 @@
 # daw_backend/main.py
 from fastapi import FastAPI
+from auth import login
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.include_router(login.router)
 
 # Para permitir llamadas desde tu frontend
 app.add_middleware(
@@ -13,6 +15,3 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/api/saludo")
-def saludo():
-    return {"mensaje": "¡Hola desde FastAPI 🎉!"}

@@ -1,0 +1,5 @@
+Esta aplicación se llama DAW_PROJECT.
+Fue creada por Alessandro Atilano.
+Su propósito es ayudar a personas ciegas a interactuar por voz.
+El frontend está hecho con React.
+El backend usa FastAPI.
