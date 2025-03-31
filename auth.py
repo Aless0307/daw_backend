@@ -1,47 +1,50 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from typing import Optional, Dict, List, Any
 from datetime import datetime, timedelta
-from typing import Optional
+import jwt
 import os
-from dotenv import load_dotenv
-from neo4j import GraphDatabase
-import numpy as np
-from azure_storage import upload_voice_recording
-from voice_processing import extract_voice_embedding
 import tempfile
-from resemblyzer import preprocess_wav, VoiceEncoder
-from config import (
-    SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES,
-    NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
-)
+import time
+import logging
+import hashlib
+import numpy as np
+import io
+from neo4j_client import Neo4jClient
+from config import SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES, VOICE_SIMILARITY_THRESHOLD
+from voice_processing import extract_voice_embedding, compare_voice_embeddings
+from azure_storage import upload_voice_recording
 
-load_dotenv()
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# Configuración de seguridad
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# Modelos
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    username: str
+    email: str
 
-# Configuración de Neo4j
-uri = os.getenv("NEO4J_URI")
-user = os.getenv("NEO4J_USER")
-password = os.getenv("NEO4J_PASSWORD")
-driver = GraphDatabase.driver(uri, auth=(user, password))
+class UserBase(BaseModel):
+    username: str
+    email: str
 
-# Configuración de JWT
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+class UserCreate(UserBase):
+    password: str
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+class UserInDB(UserBase):
+    hashed_password: str
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
+# Inicializar cliente Neo4j
+neo4j_client = Neo4jClient()
 
+# Funciones de autenticación
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
@@ -49,243 +52,218 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm="HS256")
     return encoded_jwt
 
-@router.post("/register")
+def get_password_hash(password: str) -> str:
+    """Hashea la contraseña utilizando SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifica si la contraseña coincide con el hash almacenado"""
+    return get_password_hash(plain_password) == hashed_password
+
+@router.post("/register", response_model=Dict[str, str])
 async def register(
     username: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
     voice: Optional[UploadFile] = File(None)
 ):
-    print(f"Recibiendo solicitud de registro:")
-    print(f"Username: {username}")
-    print(f"Email: {email}")
-    print(f"Voice file received: {voice is not None}")
-
-    # Verificar si el usuario ya existe
-    with driver.session() as session:
-        result = session.run(
-            "MATCH (u:User) WHERE u.email = $email OR u.username = $username RETURN u",
-            email=email,
-            username=username
-        )
-        if result.single():
-            raise HTTPException(
-                status_code=400,
-                detail="El email o nombre de usuario ya está registrado"
-            )
-
-    # Procesar la grabación de voz si se proporciona
-    voice_url = None
-    voice_embedding = None
-    if voice:
-        try:
-            print("Procesando archivo de voz...")
-            # Guardar el archivo temporalmente
-            temp_path = f"temp_{voice.filename}"
-            with open(temp_path, "wb") as buffer:
-                content = await voice.read()
-                buffer.write(content)
-            print(f"Archivo temporal guardado en: {temp_path}")
-
-            # Extraer el embedding de voz
-            voice_embedding = extract_voice_embedding(temp_path)
-            print("Embedding de voz extraído correctamente")
-            
-            # Subir el archivo a Azure
-            voice_url = upload_voice_recording(content, None)
-            print(f"Archivo subido a Azure. URL: {voice_url}")
-            
-            # Eliminar el archivo temporal
-            os.remove(temp_path)
-            print("Archivo temporal eliminado")
-            
-        except Exception as e:
-            print(f"Error al procesar la grabación de voz: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error al procesar la grabación de voz: {str(e)}"
-            )
-
+    """
+    Registra un nuevo usuario con credenciales y opcionalmente grabación de voz
+    """
     try:
-        # Crear el usuario en Neo4j
-        with driver.session() as session:
-            result = session.run(
-                """
-                CREATE (u:User {
-                    username: $username,
-                    email: $email,
-                    password: $password,
-                    voice_url: $voice_url,
-                    voice_embedding: $voice_embedding
-                })
-                RETURN elementId(u) as id, u
-                """,
-                username=username,
-                email=email,
-                password=get_password_hash(password),
-                voice_url=voice_url,
-                voice_embedding=voice_embedding.tolist() if voice_embedding is not None else None
-            )
-            user_data = result.single()
-            user_id = user_data["id"]
-            print(f"Usuario creado exitosamente con ID: {user_id}")
-
-        return {
-            "message": "Usuario registrado exitosamente",
-            "user_id": user_id
-        }
-    except Exception as e:
-        print(f"Error al crear usuario en Neo4j: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al crear usuario en la base de datos: {str(e)}"
-        )
-
-@router.post("/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    with driver.session() as session:
-        result = session.run(
-            """
-            MATCH (u:User) 
-            WHERE u.email = $email 
-            RETURN elementId(u) as id, u
-            """,
-            email=form_data.username
-        )
-        user = result.single()
-        
-        if not user or not verify_password(form_data.password, user["u"]["password"]):
+        # Verificar si el usuario ya existe
+        existing_user = neo4j_client.get_user_by_email(email)
+        if existing_user:
             raise HTTPException(
-                status_code=401,
-                detail="Credenciales incorrectas"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El email ya está registrado"
             )
-
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user["u"]["email"], "id": user["id"]},
-        expires_delta=access_token_expires
-    )
+        
+        voice_embedding = None
+        voice_url = None
+        
+        if voice:
+            # Procesar archivo de voz
+            try:
+                # Guardar temporalmente el archivo
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+                    content = await voice.read()
+                    temp_file.write(content)
+                    temp_path = temp_file.name
+                
+                # Extraer embedding
+                voice_embedding = extract_voice_embedding(temp_path).tolist()
+                logger.info(f"Embedding de voz extraído para {email}")
+                
+                # Subir el archivo a Azure
+                content_stream = io.BytesIO(content)
+                voice_url = upload_voice_recording(content_stream, email)
+                logger.info(f"Archivo de voz subido a Azure: {voice_url}")
+                
+                # Eliminar archivo temporal
+                os.unlink(temp_path)
+                
+            except Exception as e:
+                logger.error(f"Error al procesar archivo de voz: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error al procesar archivo de voz: {str(e)}"
+                )
+        
+        # Crear usuario en la base de datos
+        hashed_password = get_password_hash(password)
+        logger.info(f"Contraseña hasheada para {email}")
+        neo4j_client.create_user_with_voice(username, email, hashed_password, voice_embedding, voice_url)
+        
+        return {"mensaje": "Usuario registrado exitosamente"}
     
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "username": user["u"]["username"],
-        "email": user["u"]["email"],
-        "user_id": user["id"]
-    }
+    except Exception as e:
+        logger.error(f"Error en el registro: {str(e)}")
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error en el registro: {str(e)}"
+        )
 
-@router.post("/login-voice")
+@router.post("/login", response_model=Token)
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    """
+    Inicia sesión con credenciales (usuario y contraseña)
+    """
+    try:
+        # Verificar credenciales
+        user = neo4j_client.verify_user_credentials(form_data.username, form_data.password)
+        
+        if not user:
+            # Intentar verificar con contraseña hasheada
+            user_from_db = neo4j_client.get_user_by_email(form_data.username)
+            if user_from_db and verify_password(form_data.password, user_from_db.get("password", "")):
+                user = user_from_db
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Credenciales incorrectas",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        
+        # Crear token
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user["email"]},
+            expires_delta=access_token_expires
+        )
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "username": user["username"],
+            "email": user["email"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error en el login: {str(e)}")
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error en el login: {str(e)}"
+        )
+
+@router.post("/login-voice", response_model=Token)
 async def login_with_voice(
-    audio: UploadFile = File(...),
+    voice: UploadFile = File(...),
     email: str = Form(...)
 ):
+    """
+    Inicia sesión con reconocimiento de voz
+    """
     try:
-        # Guardar el archivo temporalmente
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-            content = await audio.read()
-            temp_file.write(content)
-            temp_file_path = temp_file.name
-
-        # Procesar el archivo de voz
-        print("Procesando archivo de voz...")
-        wav = preprocess_wav(temp_file_path)
-        
-        # Cargar el modelo de codificación de voz
-        print("Cargando modelo de codificación de voz...")
-        encoder = VoiceEncoder()
-        print("Modelo cargado")
-
-        # Extraer el embedding de voz
-        print("Extrayendo embedding de voz...")
-        embedding = encoder.embed_utterance(wav)
-        print("Embedding de voz extraído correctamente")
-
-        # Eliminar el archivo temporal
-        os.unlink(temp_file_path)
-
-        # Conectar a Neo4j
-        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-        
-        with driver.session() as session:
-            # Buscar el usuario por email
-            result = session.run(
-                "MATCH (u:User {email: $email}) RETURN u",
-                email=email
+        # Verificar si el usuario existe
+        user = neo4j_client.get_user_by_email(email)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Usuario con email {email} no encontrado"
             )
-            user = result.single()
+        
+        # Verificar si el usuario tiene un embedding de voz almacenado
+        stored_embedding = user.get("voice_embedding")
+        if not stored_embedding:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El usuario no tiene una muestra de voz registrada"
+            )
+        
+        # Procesar archivo de voz
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+            content = await voice.read()
+            temp_file.write(content)
+            temp_path = temp_file.name
+        
+        # Extraer embedding de la voz enviada
+        try:
+            new_embedding = extract_voice_embedding(temp_path)
+        except Exception as e:
+            os.unlink(temp_path)  # Limpiar
+            logger.error(f"Error al extraer embedding: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error al procesar audio: {str(e)}"
+            )
+        
+        # Limpiar archivo temporal
+        os.unlink(temp_path)
+        
+        # Convertir stored_embedding a numpy array
+        try:
+            if isinstance(stored_embedding, str):
+                stored_embedding = eval(stored_embedding)
             
-            if not user:
-                raise HTTPException(
-                    status_code=401,
-                    detail="Usuario no encontrado"
-                )
-
-            # Obtener el embedding guardado
-            stored_embedding = user["u"].get("voice_embedding")
-            if not stored_embedding:
-                raise HTTPException(
-                    status_code=401,
-                    detail="No se encontró una grabación de voz para este usuario"
-                )
-
-            # Convertir el embedding almacenado a numpy array
-            try:
-                # Si el embedding está almacenado como string
-                if isinstance(stored_embedding, str):
-                    stored_embedding = np.array(eval(stored_embedding))
-                # Si ya es una lista
-                elif isinstance(stored_embedding, list):
-                    stored_embedding = np.array(stored_embedding)
-                else:
-                    raise ValueError("Formato de embedding no válido")
-            except Exception as e:
-                print(f"Error al procesar el embedding almacenado: {str(e)}")
-                raise HTTPException(
-                    status_code=500,
-                    detail="Error al procesar la grabación de voz almacenada"
-                )
-
-            # Calcular la similitud entre los embeddings
-            similarity = np.dot(embedding, stored_embedding) / (np.linalg.norm(embedding) * np.linalg.norm(stored_embedding))
-            print(f"Similitud calculada: {similarity}")
+            # Comparar embeddings
+            is_match = compare_voice_embeddings(new_embedding, stored_embedding, VOICE_SIMILARITY_THRESHOLD)
+            similarity = float(np.dot(new_embedding, stored_embedding) / 
+                            (np.linalg.norm(new_embedding) * np.linalg.norm(stored_embedding)))
             
-            # Definir un umbral de similitud más bajo para desarrollo
-            SIMILARITY_THRESHOLD = 0.75  # Reducido de 0.85 a 0.75
+            print(f"Similitud calculada: {similarity:.4f}, Umbral: {VOICE_SIMILARITY_THRESHOLD}")
             
-            if similarity < SIMILARITY_THRESHOLD:
-                print(f"Similitud ({similarity:.4f}) por debajo del umbral ({SIMILARITY_THRESHOLD})")
+            if not is_match:
                 raise HTTPException(
-                    status_code=401,
-                    detail=f"La voz no coincide con la grabación registrada (similitud: {similarity:.4f})"
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=f"La voz no coincide con la registrada (similitud: {similarity:.2f})"
                 )
-
-            print(f"Autenticación exitosa con similitud: {similarity:.4f}")
-
-            # Crear el token de acceso
+            
+            # Crear token
             access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = create_access_token(
-                data={"sub": user["u"]["email"]},
+                data={"sub": user["email"]},
                 expires_delta=access_token_expires
             )
-
+            
             return {
                 "access_token": access_token,
                 "token_type": "bearer",
-                "user": {
-                    "email": user["u"]["email"],
-                    "username": user["u"]["username"]
-                }
+                "username": user["username"],
+                "email": user["email"]
             }
-
+            
+        except Exception as e:
+            if isinstance(e, HTTPException):
+                raise
+            logger.error(f"Error al comparar voces: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error al verificar la voz: {str(e)}"
+            )
+    
     except Exception as e:
-        print(f"Error en login con voz: {str(e)}")
+        logger.error(f"Error en login con voz: {str(e)}")
+        if isinstance(e, HTTPException):
+            raise
         raise HTTPException(
-            status_code=500,
-            detail=f"Error al procesar la autenticación por voz: {str(e)}"
-        )
-    finally:
-        if 'driver' in locals():
-            driver.close() 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error en el login con voz: {str(e)}"
+        ) 
