@@ -19,9 +19,9 @@ load_dotenv()
 
 # Configuración de Neo4j
 logger.info("Cargando configuración de Neo4j...")
-NEO4J_URI = os.getenv("NEO4J_URI")
-NEO4J_USER = os.getenv("NEO4J_USER")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
+NEO4J_URI = "neo4j+s://2908cbb6.databases.neo4j.io"
+NEO4J_USER = "neo4j"
+NEO4J_PASSWORD= "okpcccPwFflZctGvH58eBUQ8Z7GM_XGtMCifFO6pgfg"
 
 # Verificar variables de entorno críticas
 if not all([NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD]):

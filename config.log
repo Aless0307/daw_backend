@@ -1,0 +1,8 @@
+2025-04-02 12:57:16,021 - __main__ - INFO - Cargando configuración de Neo4j...
+2025-04-02 12:57:16,021 - __main__ - INFO - NEO4J_URI: neo4j+s://2908cbb6.databases.neo4j.io
+2025-04-02 12:57:16,021 - __main__ - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 12:57:16,021 - __main__ - INFO - Configuración final cargada correctamente
+2025-04-02 12:57:53,856 - __main__ - INFO - Cargando configuración de Neo4j...
+2025-04-02 12:57:53,856 - __main__ - INFO - NEO4J_URI: neo4j+s://2908cbb6.databases.neo4j.io
+2025-04-02 12:57:53,856 - __main__ - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 12:57:53,856 - __main__ - INFO - Configuración final cargada correctamente
