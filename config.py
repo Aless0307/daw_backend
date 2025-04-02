@@ -1,9 +1,17 @@
 import os
 from dotenv import load_dotenv
 import logging
+import time
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('config.log')
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # Cargar variables de entorno
@@ -14,6 +22,11 @@ logger.info("Cargando configuración de Neo4j...")
 NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_USER = os.getenv("NEO4J_USER")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
+
+# Verificar variables de entorno críticas
+if not all([NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD]):
+    logger.error("Faltan variables de entorno críticas para Neo4j")
+    raise ValueError("Las variables de entorno NEO4J_URI, NEO4J_USER y NEO4J_PASSWORD son requeridas")
 
 logger.info(f"NEO4J_URI: {NEO4J_URI}")
 logger.info("Variables de entorno de Neo4j cargadas correctamente")
@@ -45,6 +58,10 @@ PRODUCTION_URL = os.getenv("PRODUCTION_URL", "https://daw-backend.onrender.com")
 
 # Clave de API de GROQ
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+# Configuración de reintentos para Neo4j
+NEO4J_MAX_RETRIES = int(os.getenv("NEO4J_MAX_RETRIES", "3"))
+NEO4J_RETRY_DELAY = int(os.getenv("NEO4J_RETRY_DELAY", "2"))
 
 # Mostrar configuración final
 logger.info("Configuración final cargada correctamente")

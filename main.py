@@ -59,6 +59,13 @@ async def log_requests(request: Request, call_next):
     try:
         response = await call_next(request)
         process_time = time.time() - start_time
+        
+        # Añadir headers CORS a la respuesta
+        response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        
         logger.info(f"Respuesta enviada: {request.method} {request.url.path} - Código: {response.status_code} - Tiempo: {process_time:.2f}s")
         return response
     except Exception as e:
