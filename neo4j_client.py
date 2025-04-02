@@ -77,7 +77,9 @@ class Neo4jClient:
                 logger.info(f"Ejecutando consulta (intento {attempt + 1}/{NEO4J_MAX_RETRIES})")
                 with self.driver.session() as session:
                     result = session.run(query, params or {})
-                    return result
+                    # Consumir el resultado inmediatamente para evitar problemas de conexión
+                    records = list(result)
+                    return records
             except Exception as e:
                 logger.error(f"Error en consulta (intento {attempt + 1}): {str(e)}")
                 if attempt < NEO4J_MAX_RETRIES - 1:
@@ -95,10 +97,10 @@ class Neo4jClient:
             MATCH (u:User {email: $email})
             RETURN u
             """
-            result = self._execute_query(query, {"email": email})
-            user = result.single()
+            records = self._execute_query(query, {"email": email})
             
-            if user:
+            if records:
+                user = records[0]
                 logger.info(f"Usuario encontrado: {user['u']['username']}")
                 return dict(user['u'])
             else:
@@ -134,10 +136,9 @@ class Neo4jClient:
                 "voice_url": voice_url
             }
             
-            result = self._execute_query(query, params)
-            user = result.single()
+            records = self._execute_query(query, params)
             
-            if user:
+            if records:
                 logger.info(f"Usuario creado exitosamente: {username}")
                 return True
             else:
@@ -157,9 +158,12 @@ class Neo4jClient:
             RETURN u
             """
             result = self._execute_query(query, {"email": email, "password": password})
-            user = result.single()
             
-            if user:
+            # Obtener todos los registros antes de consumir el resultado
+            records = list(result)
+            
+            if records:
+                user = records[0]
                 logger.info(f"Credenciales válidas para: {email}")
                 return dict(user['u'])
             else:
