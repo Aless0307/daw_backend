@@ -195,73 +195,67 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 @router.post("/login-voice", response_model=Token)
 async def login_with_voice(
-    voice: UploadFile = File(...),
-    email: str = Form(...)
+    email: str = Form(...),
+    voice: UploadFile = File(...)
 ):
-    """
-    Inicia sesión con reconocimiento de voz
-    """
+    logger.info(f"Iniciando login con voz para email: {email}")
+    start_time = time.time()
+    
     try:
         # Verificar si el usuario existe
         user = neo4j_client.get_user_by_email(email)
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Usuario con email {email} no encontrado"
+            logger.warning(f"Intento de login con email no registrado: {email}")
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Credenciales inválidas"}
             )
         
-        # Verificar si el usuario tiene un embedding de voz almacenado
-        stored_embedding = user.get("voice_embedding")
-        if not stored_embedding:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El usuario no tiene una muestra de voz registrada"
-            )
-        
-        # Procesar archivo de voz
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-            content = await voice.read()
-            temp_file.write(content)
-            temp_path = temp_file.name
-        
-        # Extraer embedding de la voz enviada
+        # Procesar el archivo de voz
+        logger.info(f"Procesando archivo de voz para: {email}")
         try:
-            new_embedding = extract_voice_embedding(temp_path)
-        except Exception as e:
-            os.unlink(temp_path)  # Limpiar
-            logger.error(f"Error al extraer embedding: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error al procesar audio: {str(e)}"
-            )
-        
-        # Limpiar archivo temporal
-        os.unlink(temp_path)
-        
-        # Convertir stored_embedding a numpy array
-        try:
-            if isinstance(stored_embedding, str):
-                stored_embedding = eval(stored_embedding)
+            # Guardar el archivo temporalmente
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+                content = await voice.read()
+                temp_file.write(content)
+                temp_file_path = temp_file.name
             
-            # Comparar embeddings
-            is_match = compare_voice_embeddings(new_embedding, stored_embedding, VOICE_SIMILARITY_THRESHOLD)
-            similarity = float(np.dot(new_embedding, stored_embedding) / 
-                            (np.linalg.norm(new_embedding) * np.linalg.norm(stored_embedding)))
+            # Extraer embedding de la voz
+            logger.info("Extrayendo embedding de la voz")
+            voice_embedding = extract_voice_embedding(temp_file_path)
             
-            print(f"Similitud calculada: {similarity:.4f}, Umbral: {VOICE_SIMILARITY_THRESHOLD}")
-            
-            if not is_match:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"La voz no coincide con la registrada (similitud: {similarity:.2f})"
+            # Obtener embedding almacenado
+            stored_embedding = user.get("voice_embedding")
+            if not stored_embedding:
+                logger.warning(f"Usuario {email} no tiene embedding de voz almacenado")
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content={"detail": "Usuario no tiene voz registrada"}
                 )
             
-            # Crear token
+            # Comparar embeddings
+            logger.info("Comparando embeddings de voz")
+            similarity = compare_voice_embeddings(voice_embedding, stored_embedding)
+            logger.info(f"Similitud de voz: {similarity}")
+            
+            if similarity < VOICE_SIMILARITY_THRESHOLD:
+                logger.warning(f"Autenticación por voz fallida para {email}. Similitud: {similarity}")
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"detail": "Voz no reconocida"}
+                )
+            
+            # Crear token de acceso
+            logger.info(f"Creando token de acceso para: {email}")
             access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = create_access_token(
-                data={"sub": user["email"]},
+                data={"sub": email},
                 expires_delta=access_token_expires
             )
+            
+            # Calcular tiempo de procesamiento
+            process_time = time.time() - start_time
+            logger.info(f"Login con voz completado para {email}. Tiempo: {process_time:.2f}s")
             
             return {
                 "access_token": access_token,
@@ -271,19 +265,22 @@ async def login_with_voice(
             }
             
         except Exception as e:
-            if isinstance(e, HTTPException):
-                raise
-            logger.error(f"Error al comparar voces: {str(e)}")
-            raise HTTPException(
+            logger.error(f"Error al procesar voz para {email}: {str(e)}")
+            return JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error al verificar la voz: {str(e)}"
+                content={"detail": "Error al procesar la voz"}
             )
+        finally:
+            # Limpiar archivo temporal
+            if 'temp_file_path' in locals():
+                try:
+                    os.unlink(temp_file_path)
+                except Exception as e:
+                    logger.error(f"Error al eliminar archivo temporal: {str(e)}")
     
     except Exception as e:
-        logger.error(f"Error en login con voz: {str(e)}")
-        if isinstance(e, HTTPException):
-            raise
-        raise HTTPException(
+        logger.error(f"Error en login con voz para {email}: {str(e)}")
+        return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error en el login con voz: {str(e)}"
+            content={"detail": "Error interno del servidor"}
         ) 
