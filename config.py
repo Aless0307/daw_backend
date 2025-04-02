@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import logging
 import time
+from keys import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
 
 # Configurar logging
 logging.basicConfig(
@@ -19,9 +20,8 @@ load_dotenv()
 
 # Configuración de Neo4j
 logger.info("Cargando configuración de Neo4j...")
-NEO4J_URI = "neo4j+s://2908cbb6.databases.neo4j.io"
-NEO4J_USER = "neo4j"
-NEO4J_PASSWORD= "okpcccPwFflZctGvH58eBUQ8Z7GM_XGtMCifFO6pgfg"
+NEO4J_MAX_RETRIES = int(os.getenv("NEO4J_MAX_RETRIES", "3"))
+NEO4J_RETRY_DELAY = int(os.getenv("NEO4J_RETRY_DELAY", "2"))
 
 # Verificar variables de entorno críticas
 if not all([NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD]):
@@ -59,9 +59,13 @@ PRODUCTION_URL = os.getenv("PRODUCTION_URL", "https://daw-backend.onrender.com")
 # Clave de API de GROQ
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# Configuración de reintentos para Neo4j
-NEO4J_MAX_RETRIES = int(os.getenv("NEO4J_MAX_RETRIES", "3"))
-NEO4J_RETRY_DELAY = int(os.getenv("NEO4J_RETRY_DELAY", "2"))
+# Configuración de timeouts
+REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
+NEO4J_TIMEOUT = int(os.getenv("NEO4J_TIMEOUT", "10"))
+
+# Configuración de reintentos
+MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
+RETRY_DELAY = int(os.getenv("RETRY_DELAY", "2"))
 
 # Mostrar configuración final
 logger.info("Configuración final cargada correctamente")

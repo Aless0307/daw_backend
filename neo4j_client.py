@@ -1,9 +1,11 @@
-from neo4j import GraphDatabase
-from config import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
+from neo4j import GraphDatabase, Driver, Session
+from keys import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
+from config import NEO4J_MAX_RETRIES, NEO4J_RETRY_DELAY
 import logging
 import hashlib
 import time
 from neo4j.exceptions import ServiceUnavailable, SessionExpired
+from typing import Optional, Dict, Any
 
 # Configurar logging
 logging.basicConfig(
@@ -18,65 +20,163 @@ logger = logging.getLogger(__name__)
 
 class Neo4jClient:
     def __init__(self):
-        self.driver = None
-        self.connect()
+        self.driver: Optional[Driver] = None
+        self._connect()
 
-    def connect(self):
-        """Establece la conexión con Neo4j Aura"""
-        max_retries = 3
-        retry_delay = 2  # segundos
-        
-        for attempt in range(max_retries):
+    def _connect(self):
+        """Establece la conexión con Neo4j con reintentos"""
+        logger.info("Iniciando conexión con Neo4j...")
+        for attempt in range(NEO4J_MAX_RETRIES):
             try:
-                logger.info(f"Intento {attempt + 1} de {max_retries} para conectar a Neo4j Aura: {NEO4J_URI}")
+                logger.info(f"Intento de conexión {attempt + 1}/{NEO4J_MAX_RETRIES}")
                 self.driver = GraphDatabase.driver(
                     NEO4J_URI,
-                    auth=(NEO4J_USER, NEO4J_PASSWORD),
-                    max_connection_lifetime=300,  # 5 minutos
-                    max_connection_pool_size=50,
-                    connection_timeout=5
+                    auth=(NEO4J_USER, NEO4J_PASSWORD)
                 )
                 
-                # Verificar conexión
+                # Verificar la conexión
                 with self.driver.session() as session:
-                    result = session.run("RETURN 1 as num")
-                    record = result.single()
-                    if record and record["num"] == 1:
-                        logger.info("Conexión exitosa con Neo4j Aura")
-                        return
-                    else:
-                        raise Exception("No se pudo verificar la conexión")
-                        
-            except (ServiceUnavailable, SessionExpired) as e:
-                logger.warning(f"Error de conexión en intento {attempt + 1}: {str(e)}")
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
-                    continue
-                raise
+                    result = session.run("RETURN 1")
+                    result.single()
+                    logger.info("Conexión con Neo4j establecida exitosamente")
+                    return
+                    
             except Exception as e:
-                logger.error(f"Error inesperado al conectar con Neo4j Aura: {str(e)}")
-                raise
+                logger.error(f"Error en intento {attempt + 1}: {str(e)}")
+                if attempt < NEO4J_MAX_RETRIES - 1:
+                    logger.info(f"Reintentando en {NEO4J_RETRY_DELAY} segundos...")
+                    time.sleep(NEO4J_RETRY_DELAY)
+                else:
+                    logger.error("No se pudo establecer conexión con Neo4j después de varios intentos")
+                    raise
+    
+    def _verify_connection(self):
+        """Verifica que la conexión esté activa y la restablece si es necesario"""
+        try:
+            if not self.driver:
+                logger.warning("Driver de Neo4j no inicializado, reconectando...")
+                self._connect()
+            
+            with self.driver.session() as session:
+                result = session.run("RETURN 1")
+                result.single()
+                return True
+        except Exception as e:
+            logger.error(f"Error al verificar conexión: {str(e)}")
+            logger.info("Intentando reconectar...")
+            self._connect()
+            return False
+    
+    def _execute_query(self, query: str, params: Dict[str, Any] = None) -> Any:
+        """Ejecuta una consulta con manejo de errores y reintentos"""
+        if not self._verify_connection():
+            raise Exception("No se pudo establecer conexión con Neo4j")
+        
+        for attempt in range(NEO4J_MAX_RETRIES):
+            try:
+                logger.info(f"Ejecutando consulta (intento {attempt + 1}/{NEO4J_MAX_RETRIES})")
+                with self.driver.session() as session:
+                    result = session.run(query, params or {})
+                    return result
+            except Exception as e:
+                logger.error(f"Error en consulta (intento {attempt + 1}): {str(e)}")
+                if attempt < NEO4J_MAX_RETRIES - 1:
+                    logger.info(f"Reintentando consulta en {NEO4J_RETRY_DELAY} segundos...")
+                    time.sleep(NEO4J_RETRY_DELAY)
+                    self._verify_connection()
+                else:
+                    raise
+    
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Obtiene un usuario por su email"""
+        logger.info(f"Buscando usuario con email: {email}")
+        try:
+            query = """
+            MATCH (u:User {email: $email})
+            RETURN u
+            """
+            result = self._execute_query(query, {"email": email})
+            user = result.single()
+            
+            if user:
+                logger.info(f"Usuario encontrado: {user['u']['username']}")
+                return dict(user['u'])
+            else:
+                logger.info(f"No se encontró usuario con email: {email}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error al buscar usuario: {str(e)}")
+            raise
+    
+    def create_user_with_voice(self, username: str, email: str, password: str, 
+                             voice_embedding: Any = None, voice_url: str = None) -> bool:
+        """Crea un nuevo usuario con su embedding de voz"""
+        logger.info(f"Creando usuario: {username} ({email})")
+        try:
+            query = """
+            CREATE (u:User {
+                username: $username,
+                email: $email,
+                password: $password,
+                voice_embedding: $voice_embedding,
+                voice_url: $voice_url,
+                created_at: datetime()
+            })
+            RETURN u
+            """
+            
+            params = {
+                "username": username,
+                "email": email,
+                "password": password,
+                "voice_embedding": voice_embedding.tolist() if voice_embedding is not None else None,
+                "voice_url": voice_url
+            }
+            
+            result = self._execute_query(query, params)
+            user = result.single()
+            
+            if user:
+                logger.info(f"Usuario creado exitosamente: {username}")
+                return True
+            else:
+                logger.error("No se pudo crear el usuario")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error al crear usuario: {str(e)}")
+            raise
+    
+    def verify_user_credentials(self, email: str, password: str) -> Optional[Dict[str, Any]]:
+        """Verifica las credenciales de un usuario"""
+        logger.info(f"Verificando credenciales para: {email}")
+        try:
+            query = """
+            MATCH (u:User {email: $email, password: $password})
+            RETURN u
+            """
+            result = self._execute_query(query, {"email": email, "password": password})
+            user = result.single()
+            
+            if user:
+                logger.info(f"Credenciales válidas para: {email}")
+                return dict(user['u'])
+            else:
+                logger.warning(f"Credenciales inválidas para: {email}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error al verificar credenciales: {str(e)}")
+            raise
 
     def close(self):
         """Cierra la conexión con Neo4j"""
         if self.driver:
-            logger.info("Cerrando conexión con Neo4j Aura")
+            logger.info("Cerrando conexión con Neo4j...")
             self.driver.close()
             self.driver = None
-
-    def get_session(self):
-        """Obtiene una sesión de Neo4j con manejo de errores"""
-        if not self.driver:
-            logger.error("Intento de obtener sesión sin conexión activa")
-            self.connect()
-        
-        try:
-            session = self.driver.session()
-            logger.debug("Sesión de Neo4j obtenida correctamente")
-            return session
-        except Exception as e:
-            logger.error(f"Error al obtener sesión de Neo4j: {str(e)}")
-            raise
+            logger.info("Conexión cerrada")
 
     def create_user(self, username: str, email: str, password: str, voice_embedding: list = None):
         """Crea un nuevo usuario en la base de datos"""
@@ -84,7 +184,7 @@ class Neo4jClient:
         start_time = time.time()
         
         try:
-            with self.get_session() as session:
+            with self.driver.session() as session:
                 # Verificar si el usuario ya existe
                 result = session.run(
                     "MATCH (u:User {email: $email}) RETURN u",
@@ -123,52 +223,6 @@ class Neo4jClient:
             logger.error(f"Error al crear usuario {username} ({email}): {str(e)}")
             return False
 
-    def create_user_with_voice(self, username: str, email: str, password: str, voice_embedding: list = None, voice_url: str = None):
-        """Crea un nuevo usuario con grabación de voz en la base de datos"""
-        with self.driver.session() as session:
-            try:
-                query = """
-                CREATE (u:User {
-                    username: $username,
-                    email: $email,
-                    password: $password,
-                    voice_embedding: $voice_embedding,
-                    voice_url: $voice_url,
-                    created_at: datetime()
-                })
-                RETURN id(u)
-                """
-                result = session.run(query, 
-                          username=username,
-                          email=email,
-                          password=password,
-                          voice_embedding=voice_embedding,
-                          voice_url=voice_url)
-                record = result.single()
-                user_id = record[0] if record else None
-                logger.info(f"Usuario creado con voz: {username} con ID {user_id}")
-                return True
-            except Exception as e:
-                logger.error(f"Error al crear usuario con voz: {str(e)}")
-                raise
-
-    def get_user_by_email(self, email: str):
-        """Obtiene un usuario por su email"""
-        with self.driver.session() as session:
-            try:
-                query = """
-                MATCH (u:User {email: $email})
-                RETURN u {.*} as user
-                """
-                result = session.run(query, email=email)
-                record = result.single()
-                if record:
-                    return record["user"]
-                return None
-            except Exception as e:
-                logger.error(f"Error al obtener usuario: {str(e)}")
-                raise
-
     def update_user_voice_embedding(self, email: str, voice_embedding: list):
         """Actualiza el embedding de voz de un usuario"""
         with self.driver.session() as session:
@@ -203,42 +257,6 @@ class Neo4jClient:
                 return None
             except Exception as e:
                 logger.error(f"Error al actualizar URL de voz: {str(e)}")
-                raise
-
-    def verify_user_credentials(self, email: str, password: str):
-        """Verifica las credenciales de un usuario"""
-        with self.driver.session() as session:
-            try:
-                # Obtener usuario por email
-                query = """
-                MATCH (u:User {email: $email})
-                RETURN u {.*} as user
-                """
-                result = session.run(query, email=email)
-                record = result.single()
-                
-                if not record:
-                    logger.warning(f"Usuario no encontrado: {email}")
-                    return None
-                
-                user = record["user"]
-                stored_password = user.get("password", "")
-                
-                # Verificar contraseña hasheada
-                hashed_password = hashlib.sha256(password.encode()).hexdigest()
-                
-                logger.info(f"Verificando credenciales para {email}")
-                logger.debug(f"Stored hash: {stored_password[:10]}... Input hash: {hashed_password[:10]}...")
-                
-                if stored_password == hashed_password:
-                    logger.info(f"Credenciales válidas para {email}")
-                    return user
-                else:
-                    logger.warning(f"Contraseña incorrecta para {email}")
-                    return None
-                
-            except Exception as e:
-                logger.error(f"Error al verificar credenciales: {str(e)}")
                 raise
 
     def get_user_voice_embedding(self, email: str):
