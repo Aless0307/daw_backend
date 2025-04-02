@@ -39,6 +39,17 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+# Configuración de CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:8003", "https://daw-frontend.vercel.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
+)
+
 # Middleware para logging de solicitudes
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -53,17 +64,6 @@ async def log_requests(request: Request, call_next):
     except Exception as e:
         logger.error(f"Error al procesar solicitud: {request.method} {request.url.path} - Error: {str(e)}")
         raise
-
-# Configuración de CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8003", "https://daw-frontend.vercel.app"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=3600,
-)
 
 # Incluir rutas de autenticación
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
