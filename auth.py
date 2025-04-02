@@ -18,7 +18,14 @@ from voice_processing import extract_voice_embedding, compare_voice_embeddings
 from azure_storage import upload_voice_recording
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('auth.log')
+    ]
+)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -46,21 +53,23 @@ neo4j_client = Neo4jClient()
 
 # Funciones de autenticación
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    logger.info(f"Creando token de acceso para: {data.get('sub', 'desconocido')}")
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm="HS256")
+    logger.debug(f"Token creado con expiración: {expire}")
     return encoded_jwt
 
 def get_password_hash(password: str) -> str:
-    """Hashea la contraseña utilizando SHA-256"""
+    logger.debug("Generando hash de contraseña")
     return hashlib.sha256(password.encode()).hexdigest()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifica si la contraseña coincide con el hash almacenado"""
+    logger.debug("Verificando contraseña")
     return get_password_hash(plain_password) == hashed_password
 
 @router.post("/register", response_model=Dict[str, str])
@@ -70,63 +79,74 @@ async def register(
     password: str = Form(...),
     voice: Optional[UploadFile] = File(None)
 ):
-    """
-    Registra un nuevo usuario con credenciales y opcionalmente grabación de voz
-    """
+    logger.info(f"Iniciando registro de usuario: {username} ({email})")
+    start_time = time.time()
+    
     try:
         # Verificar si el usuario ya existe
         existing_user = neo4j_client.get_user_by_email(email)
         if existing_user:
-            raise HTTPException(
+            logger.warning(f"Intento de registro con email existente: {email}")
+            return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El email ya está registrado"
+                content={"detail": "El email ya está registrado"}
             )
         
+        # Procesar voz si se proporciona
         voice_embedding = None
         voice_url = None
-        
         if voice:
-            # Procesar archivo de voz
+            logger.info(f"Procesando archivo de voz para: {username}")
             try:
-                # Guardar temporalmente el archivo
+                # Guardar archivo temporalmente
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
                     content = await voice.read()
                     temp_file.write(content)
-                    temp_path = temp_file.name
+                    temp_file_path = temp_file.name
                 
-                # Extraer embedding
-                voice_embedding = extract_voice_embedding(temp_path).tolist()
-                logger.info(f"Embedding de voz extraído para {email}")
+                # Extraer embedding de voz
+                voice_embedding = extract_voice_embedding(temp_file_path)
+                logger.info(f"Embedding de voz extraído para: {username}")
                 
-                # Subir el archivo a Azure
-                content_stream = io.BytesIO(content)
-                voice_url = upload_voice_recording(content_stream, email)
+                # Subir archivo a Azure Storage
+                voice_url = upload_voice_recording(content, f"{email}_{int(time.time())}.wav")
                 logger.info(f"Archivo de voz subido a Azure: {voice_url}")
                 
                 # Eliminar archivo temporal
-                os.unlink(temp_path)
-                
+                os.unlink(temp_file_path)
             except Exception as e:
                 logger.error(f"Error al procesar archivo de voz: {str(e)}")
-                raise HTTPException(
+                return JSONResponse(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Error al procesar archivo de voz: {str(e)}"
+                    content={"detail": "Error al procesar el archivo de voz"}
                 )
         
         # Crear usuario en la base de datos
         hashed_password = get_password_hash(password)
-        logger.info(f"Contraseña hasheada para {email}")
-        neo4j_client.create_user_with_voice(username, email, hashed_password, voice_embedding, voice_url)
+        success = neo4j_client.create_user_with_voice(
+            username=username,
+            email=email,
+            password=hashed_password,
+            voice_embedding=voice_embedding,
+            voice_url=voice_url
+        )
         
-        return {"mensaje": "Usuario registrado exitosamente"}
-    
+        if success:
+            process_time = time.time() - start_time
+            logger.info(f"Usuario registrado exitosamente: {username} ({email}) - Tiempo: {process_time:.2f}s")
+            return {"message": "Usuario registrado exitosamente"}
+        else:
+            logger.error(f"Error al crear usuario en la base de datos: {username} ({email})")
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": "Error al crear el usuario"}
+            )
+            
     except Exception as e:
-        logger.error(f"Error en el registro: {str(e)}")
-        if isinstance(e, HTTPException):
-            raise
-        raise HTTPException(
+        logger.error(f"Error inesperado durante el registro: {str(e)}")
+        return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error en el registro: {str(e)}"
+            content={"detail": "Error interno del servidor"}
         )
 
 @router.post("/login", response_model=Token)
