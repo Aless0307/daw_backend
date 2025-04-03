@@ -44,9 +44,10 @@ class Neo4jClient:
             self.driver = GraphDatabase.driver(
                 self.uri,
                 auth=(NEO4J_USER, NEO4J_PASSWORD),
-                max_connection_lifetime=3600,  # 1 hora para conexiones locales
-                max_connection_pool_size=100,
-                connection_timeout=10
+                max_connection_lifetime=NEO4J_MAX_CONNECTION_LIFETIME,
+                max_connection_pool_size=NEO4J_MAX_CONNECTION_POOL_SIZE,
+                connection_timeout=NEO4J_CONNECTION_TIMEOUT,
+                keep_alive=NEO4J_KEEP_ALIVE
             )
             logger.info(f"Conexión a Neo4j {'remota' if self.is_production else 'local'} establecida correctamente")
         except Exception as e:

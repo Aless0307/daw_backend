@@ -2,7 +2,15 @@ import os
 from dotenv import load_dotenv
 import logging
 import time
-from keys import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
+from keys import (
+    NEO4J_URI_LOCAL,
+    NEO4J_URI_PRODUCTION,
+    NEO4J_USER,
+    NEO4J_PASSWORD,
+    SECRET_KEY,
+    ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_MINUTES
+)
 
 # Configurar logging
 logging.basicConfig(
@@ -18,29 +26,33 @@ logger = logging.getLogger(__name__)
 # Cargar variables de entorno
 load_dotenv()
 
+# Determinar el entorno
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+NEO4J_URI = NEO4J_URI_PRODUCTION if ENVIRONMENT == 'production' else NEO4J_URI_LOCAL
+
 # Configuración de Neo4j
 logger.info("Cargando configuración de Neo4j...")
-NEO4J_MAX_RETRIES = int(os.getenv("NEO4J_MAX_RETRIES", "3"))
-NEO4J_RETRY_DELAY = int(os.getenv("NEO4J_RETRY_DELAY", "2"))
+NEO4J_MAX_RETRIES = 3
+NEO4J_RETRY_DELAY = 2  # segundos
 
-# Configuración específica para Neo4j local
-NEO4J_MAX_CONNECTION_LIFETIME = int(os.getenv("NEO4J_MAX_CONNECTION_LIFETIME", "3600"))  # 1 hora
-NEO4J_MAX_CONNECTION_POOL_SIZE = int(os.getenv("NEO4J_MAX_CONNECTION_POOL_SIZE", "100"))
-NEO4J_CONNECTION_TIMEOUT = int(os.getenv("NEO4J_CONNECTION_TIMEOUT", "10"))
-NEO4J_KEEP_ALIVE = os.getenv("NEO4J_KEEP_ALIVE", "true").lower() == "true"
+# Configuración de Neo4j Aura
+NEO4J_MAX_CONNECTION_LIFETIME = 300  # 5 minutos
+NEO4J_MAX_CONNECTION_POOL_SIZE = 50
+NEO4J_CONNECTION_TIMEOUT = 5
+NEO4J_KEEP_ALIVE = True
 
-# Verificar variables de entorno críticas
+# Verificar variables críticas
 if not all([NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD]):
     logger.error("Faltan variables de entorno críticas para Neo4j")
-    raise ValueError("Las variables de entorno NEO4J_URI, NEO4J_USER y NEO4J_PASSWORD son requeridas")
+    raise ValueError("Faltan variables de entorno críticas para Neo4j")
 
-logger.info(f"NEO4J_URI: {NEO4J_URI}")
-logger.info("Variables de entorno de Neo4j cargadas correctamente")
+logger.info(f"Cargando configuración para entorno: {ENVIRONMENT}")
+logger.info(f"URI de Neo4j: {NEO4J_URI}")
 
 # Configuración de JWT
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+SECRET_KEY = SECRET_KEY
+ALGORITHM = ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = ACCESS_TOKEN_EXPIRE_MINUTES
 
 # Configuración de Azure Storage
 AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
