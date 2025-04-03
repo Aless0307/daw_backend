@@ -1,13 +1,19 @@
 # daw_backend/main.py
-from fastapi import FastAPI, Request, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from datetime import datetime, timedelta
+from typing import Optional
 import logging
 import time
 from auth import router as auth_router
 from config import (
     CORS_ORIGINS, FRONTEND_URL, REQUEST_TIMEOUT,
-    NEO4J_TIMEOUT, MAX_RETRIES, RETRY_DELAY
+    NEO4J_TIMEOUT, MAX_RETRIES, RETRY_DELAY,
+    SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
 # Configurar logging
@@ -30,7 +36,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
+
+# Configuración de seguridad
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Middleware para logging y manejo de errores
 @app.middleware("http")
@@ -52,10 +63,12 @@ async def log_requests(request: Request, call_next):
         response = await call_next(request)
         
         # Añadir headers CORS a la respuesta
-        response.headers["Access-Control-Allow-Origin"] = FRONTEND_URL
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        origin = request.headers.get("origin")
+        if origin in CORS_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         
         process_time = time.time() - start_time
         logger.info(f"Solicitud completada: {request.method} {request.url.path} - Tiempo: {process_time:.2f}s")
