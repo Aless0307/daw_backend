@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import logging
 import time
+from typing import Optional
 from keys import (
     NEO4J_URI_LOCAL,
     NEO4J_URI_PRODUCTION,
@@ -26,9 +27,9 @@ logger = logging.getLogger(__name__)
 # Cargar variables de entorno
 load_dotenv()
 
-# Determinar el entorno
-ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
-NEO4J_URI = NEO4J_URI_PRODUCTION if ENVIRONMENT == 'production' else NEO4J_URI_LOCAL
+# Configuración de Neo4j
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+NEO4J_URI = NEO4J_URI_PRODUCTION if ENVIRONMENT == "production" else NEO4J_URI_LOCAL
 
 # Configuración de Neo4j
 logger.info("Cargando configuración de Neo4j...")
@@ -59,10 +60,9 @@ AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 AZURE_STORAGE_CONTAINER_NAME = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
 
 # Configuración de CORS
-CORS_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:8003",
-    "https://daw-frontend.vercel.app"
+ALLOWED_ORIGINS = [
+    "https://daw-frontend.vercel.app",
+    "http://localhost:5173"
 ]
 
 # URL del frontend

@@ -10,6 +10,8 @@ from typing import Optional
 import logging
 import time
 from auth import router as auth_router
+from voice import router as voice_router
+from groq_client import router as groq_router
 from config import (
     CORS_ORIGINS, FRONTEND_URL, REQUEST_TIMEOUT,
     NEO4J_TIMEOUT, MAX_RETRIES, RETRY_DELAY,
@@ -32,11 +34,10 @@ app = FastAPI()
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=["https://daw-frontend.vercel.app", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
 )
 
 # Configuración de seguridad
@@ -91,8 +92,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Error interno del servidor"}
     )
 
-# Incluir rutas de autenticación
+# Incluir routers
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(voice_router, prefix="/voice", tags=["voice"])
+app.include_router(groq_router, prefix="/groq", tags=["groq"])
 
 @app.get("/")
 async def root():

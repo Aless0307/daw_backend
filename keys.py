@@ -3,7 +3,7 @@ GROQ_API_KEY = "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"
 
 # Credenciales de Neo4j
 NEO4J_URI_LOCAL = "bolt://localhost:7687"
-NEO4J_URI_PRODUCTION = "bolt://dane-warm-secondly.ngrok-free.app:7687"
+NEO4J_URI_PRODUCTION = "bolt://mighty-icons-watch.loca.lt:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = "alessandro2003"
 
@@ -13,5 +13,5 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 # Azure Storage
-CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=proyectodawalessandro;AccountKey=slv70LImQP45UYRa/5qWmI2i8EVYBKhtg9mKAm7vrLNnD0glzQXcGueBwEZrtu9ay+5OIPh38r70+AStSAPV7A==;EndpointSuffix=core.windows.net"
-NOMBRE_CONTENEDOR = "daw"
+CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=dawproyecto;AccountKey=QwXyZ9K8mN2pL5vR7tY3uB6cE1gH4jM9nP2qS5wD8fA3;EndpointSuffix=core.windows.net"
+NOMBRE_CONTENEDOR = "dawproyecto"
