@@ -10,22 +10,18 @@ from typing import Optional
 import logging
 import time
 from auth import router as auth_router
-from voice import router as voice_router
-from groq_client import router as groq_router
+from voice_processing import router as voice_router
 from config import (
-    CORS_ORIGINS, FRONTEND_URL, REQUEST_TIMEOUT,
-    NEO4J_TIMEOUT, MAX_RETRIES, RETRY_DELAY,
-    SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+    ALLOWED_ORIGINS,
+    SECRET_KEY,
+    ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
 # Configurar logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('app.log')
-    ]
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -34,7 +30,7 @@ app = FastAPI()
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://daw-frontend.vercel.app", "http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,7 +61,7 @@ async def log_requests(request: Request, call_next):
         
         # Añadir headers CORS a la respuesta
         origin = request.headers.get("origin")
-        if origin in CORS_ORIGINS:
+        if origin in ALLOWED_ORIGINS:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
@@ -95,7 +91,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Incluir routers
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(voice_router, prefix="/voice", tags=["voice"])
-app.include_router(groq_router, prefix="/groq", tags=["groq"])
 
 @app.get("/")
 async def root():
