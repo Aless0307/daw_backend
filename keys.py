@@ -1,8 +1,9 @@
 # Clave de API de GROQ
 GROQ_API_KEY = "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"
 
-# Credenciales de Neo4j local
-NEO4J_URI = "bolt://localhost:7687"
+# Credenciales de Neo4j
+NEO4J_URI_LOCAL = "bolt://localhost:7687"
+NEO4J_URI_PRODUCTION = "bolt://dane-warm-secondly.ngrok-free.app:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = "alessandro2003"
 

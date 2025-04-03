@@ -546,3 +546,8 @@ Response headers:
 2025-04-02 21:18:50,117 - auth - INFO - Creando token de acceso para: alessandroah77@gmail.com
 2025-04-02 21:18:50,118 - auth - INFO - Login con voz completado para alessandroah77@gmail.com. Tiempo: 0.39s
 2025-04-02 21:18:50,119 - main - INFO - Solicitud completada: POST /auth/login-voice - Tiempo: 0.40s
+2025-04-02 21:30:45,986 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:30:45,986 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:30:45,986 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:30:45,986 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:30:49,770 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente

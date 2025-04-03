@@ -11,6 +11,9 @@ from config import (
 )
 import time
 from neo4j.exceptions import ServiceUnavailable, SessionExpired
+import os
+import numpy as np
+from .keys import NEO4J_URI_LOCAL, NEO4J_URI_PRODUCTION
 
 # Configurar logging
 logging.basicConfig(
@@ -25,23 +28,29 @@ logger = logging.getLogger(__name__)
 
 class Neo4jClient:
     def __init__(self):
-        self.driver: Optional[Driver] = None
+        # Determinar si estamos en producción o desarrollo
+        self.is_production = os.getenv('ENVIRONMENT', 'development') == 'production'
+        self.uri = NEO4J_URI_PRODUCTION if self.is_production else NEO4J_URI_LOCAL
+        
+        logger.info(f"Inicializando Neo4jClient en modo {'producción' if self.is_production else 'desarrollo'}")
+        logger.info(f"URI de Neo4j: {self.uri}")
+        
+        self.driver = None
         self._connect()
 
     def _connect(self) -> None:
-        """Establece la conexión con Neo4j con configuración optimizada para local."""
+        """Establece la conexión con Neo4j"""
         try:
             self.driver = GraphDatabase.driver(
-                NEO4J_URI,
+                self.uri,
                 auth=(NEO4J_USER, NEO4J_PASSWORD),
-                max_connection_lifetime=NEO4J_MAX_CONNECTION_LIFETIME,
-                max_connection_pool_size=NEO4J_MAX_CONNECTION_POOL_SIZE,
-                connection_timeout=NEO4J_CONNECTION_TIMEOUT,
-                keep_alive=NEO4J_KEEP_ALIVE
+                max_connection_lifetime=3600,  # 1 hora para conexiones locales
+                max_connection_pool_size=100,
+                connection_timeout=10
             )
-            logger.info("Conexión a Neo4j local establecida correctamente")
+            logger.info(f"Conexión a Neo4j {'remota' if self.is_production else 'local'} establecida correctamente")
         except Exception as e:
-            logger.error(f"Error al conectar con Neo4j local: {str(e)}")
+            logger.error(f"Error al conectar con Neo4j: {str(e)}")
             raise
 
     def _verify_connection(self) -> bool:
