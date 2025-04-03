@@ -68,8 +68,8 @@ ALLOWED_ORIGINS = [
 # URL del frontend
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://daw-frontend.vercel.app")
 
-# Umbral de similitud de voz
-VOICE_SIMILARITY_THRESHOLD = float(os.getenv("VOICE_SIMILARITY_THRESHOLD", "0.85"))
+# Configuración de procesamiento de voz
+VOICE_SIMILARITY_THRESHOLD = 0.85  # Umbral de similitud para reconocimiento de voz
 
 # Configuración de URLs
 PRODUCTION_URL = os.getenv("PRODUCTION_URL", "https://daw-backend.onrender.com")
