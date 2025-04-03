@@ -57,21 +57,25 @@ class Neo4jClient:
                 logger.warning("Driver de Neo4j no inicializado, reconectando...")
                 self._connect()
             
+            # Intentar una consulta simple
             with self.driver.session() as session:
                 result = session.run("RETURN 1")
                 result.single()
+                logger.info("Conexión con Neo4j verificada correctamente")
                 return True
+                
         except Exception as e:
             logger.error(f"Error al verificar conexión: {str(e)}")
             logger.info("Intentando reconectar...")
-            self._connect()
-            return False
+            try:
+                self._connect()
+                return True
+            except Exception as reconnect_error:
+                logger.error(f"Error al reconectar: {str(reconnect_error)}")
+                return False
     
     def _execute_query(self, query: str, params: Dict[str, Any] = None) -> Any:
         """Ejecuta una consulta con manejo de errores y reintentos"""
-        if not self._verify_connection():
-            raise Exception("No se pudo establecer conexión con Neo4j")
-        
         for attempt in range(NEO4J_MAX_RETRIES):
             try:
                 logger.info(f"Ejecutando consulta (intento {attempt + 1}/{NEO4J_MAX_RETRIES})")
@@ -93,6 +97,10 @@ class Neo4jClient:
         """Obtiene un usuario por su email"""
         logger.info(f"Buscando usuario con email: {email}")
         try:
+            # Verificar conexión antes de la consulta
+            if not self._verify_connection():
+                raise Exception("No se pudo establecer conexión con Neo4j")
+
             query = """
             MATCH (u:User {email: $email})
             RETURN u
@@ -116,6 +124,10 @@ class Neo4jClient:
         """Crea un nuevo usuario con su embedding de voz"""
         logger.info(f"Creando usuario: {username} ({email})")
         try:
+            # Verificar conexión antes de la consulta
+            if not self._verify_connection():
+                raise Exception("No se pudo establecer conexión con Neo4j")
+
             query = """
             CREATE (u:User {
                 username: $username,
@@ -153,14 +165,15 @@ class Neo4jClient:
         """Verifica las credenciales de un usuario"""
         logger.info(f"Verificando credenciales para: {email}")
         try:
+            # Verificar conexión antes de la consulta
+            if not self._verify_connection():
+                raise Exception("No se pudo establecer conexión con Neo4j")
+
             query = """
             MATCH (u:User {email: $email, password: $password})
             RETURN u
             """
-            result = self._execute_query(query, {"email": email, "password": password})
-            
-            # Obtener todos los registros antes de consumir el resultado
-            records = list(result)
+            records = self._execute_query(query, {"email": email, "password": password})
             
             if records:
                 user = records[0]
