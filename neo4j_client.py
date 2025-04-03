@@ -1,55 +1,41 @@
-from neo4j import GraphDatabase, Driver
-from typing import List, Dict, Any, Optional
 import logging
+import time
+from neo4j import GraphDatabase
+from typing import Optional, Dict, Any, List
+import numpy as np
 from config import (
-    NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD,
-    NEO4J_MAX_RETRIES, NEO4J_RETRY_DELAY,
+    NEO4J_URI,
+    NEO4J_USER,
+    NEO4J_PASSWORD,
+    NEO4J_MAX_RETRIES,
+    NEO4J_RETRY_DELAY,
     NEO4J_MAX_CONNECTION_LIFETIME,
     NEO4J_MAX_CONNECTION_POOL_SIZE,
     NEO4J_CONNECTION_TIMEOUT,
     NEO4J_KEEP_ALIVE
 )
-import time
-from neo4j.exceptions import ServiceUnavailable, SessionExpired
-import os
-import numpy as np
-from .keys import NEO4J_URI_LOCAL, NEO4J_URI_PRODUCTION
 
 # Configurar logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('neo4j_client.log')
-    ]
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class Neo4jClient:
     def __init__(self):
-        # Determinar si estamos en producción o desarrollo
-        self.is_production = os.getenv('ENVIRONMENT', 'development') == 'production'
-        self.uri = NEO4J_URI_PRODUCTION if self.is_production else NEO4J_URI_LOCAL
-        
-        logger.info(f"Inicializando Neo4jClient en modo {'producción' if self.is_production else 'desarrollo'}")
-        logger.info(f"URI de Neo4j: {self.uri}")
-        
         self.driver = None
         self._connect()
-
-    def _connect(self) -> None:
+        
+    def _connect(self):
         """Establece la conexión con Neo4j"""
         try:
             self.driver = GraphDatabase.driver(
-                self.uri,
+                NEO4J_URI,
                 auth=(NEO4J_USER, NEO4J_PASSWORD),
                 max_connection_lifetime=NEO4J_MAX_CONNECTION_LIFETIME,
                 max_connection_pool_size=NEO4J_MAX_CONNECTION_POOL_SIZE,
                 connection_timeout=NEO4J_CONNECTION_TIMEOUT,
                 keep_alive=NEO4J_KEEP_ALIVE
             )
-            logger.info(f"Conexión a Neo4j {'remota' if self.is_production else 'local'} establecida correctamente")
+            logger.info(f"Conexión a Neo4j establecida correctamente en {NEO4J_URI}")
         except Exception as e:
             logger.error(f"Error al conectar con Neo4j: {str(e)}")
             raise
@@ -67,7 +53,7 @@ class Neo4jClient:
                     result = session.run("RETURN 1")
                     record = result.single()
                     if record and record[0] == 1:
-                        logger.info("Conexión a Neo4j local verificada correctamente")
+                        logger.info("Conexión a Neo4j verificada correctamente")
                         return True
             except Exception as e:
                 logger.error(f"Error al verificar conexión (intento {attempt + 1}/{NEO4J_MAX_RETRIES}): {str(e)}")
@@ -75,14 +61,14 @@ class Neo4jClient:
                     time.sleep(NEO4J_RETRY_DELAY)
                     self._connect()
                 else:
-                    logger.error("No se pudo establecer conexión con Neo4j local después de varios intentos")
+                    logger.error("No se pudo establecer conexión con Neo4j después de varios intentos")
                     return False
         return False
 
     def _execute_query(self, query: str, params: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """Ejecuta una consulta Cypher con manejo de errores y reintentos."""
         if not self._verify_connection():
-            raise Exception("No se pudo establecer conexión con Neo4j local")
+            raise Exception("No se pudo establecer conexión con Neo4j")
 
         for attempt in range(NEO4J_MAX_RETRIES):
             try:
@@ -172,7 +158,7 @@ class Neo4jClient:
         """Cierra la conexión con Neo4j."""
         if self.driver:
             self.driver.close()
-            logger.info("Conexión a Neo4j local cerrada")
+            logger.info("Conexión a Neo4j cerrada")
 
     def create_user(self, username: str, email: str, password: str, voice_embedding: list = None):
         """Crea un nuevo usuario en la base de datos"""

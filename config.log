@@ -551,3 +551,13 @@ Response headers:
 2025-04-02 21:30:45,986 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
 2025-04-02 21:30:45,986 - config - INFO - Configuración final cargada correctamente
 2025-04-02 21:30:49,770 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-03 08:51:47,477 - config - INFO - Cargando configuración de Neo4j...
+2025-04-03 08:51:47,477 - config - INFO - Cargando configuración para entorno: development
+2025-04-03 08:51:47,477 - config - INFO - URI de Neo4j: bolt://localhost:7687
+2025-04-03 08:51:47,477 - config - INFO - Configuración final cargada correctamente
+2025-04-03 08:51:54,562 - neo4j_client - INFO - Conexión a Neo4j establecida correctamente en bolt://localhost:7687
+2025-04-03 08:52:29,613 - main - INFO - Solicitud recibida: POST /auth/login - Cliente: 127.0.0.1
+2025-04-03 08:52:30,115 - neo4j_client - INFO - Conexión a Neo4j verificada correctamente
+2025-04-03 08:52:30,367 - neo4j_client - INFO - Conexión a Neo4j verificada correctamente
+2025-04-03 08:52:30,501 - auth - INFO - Creando token de acceso para: ale@gmail.com
+2025-04-03 08:52:30,502 - main - INFO - Solicitud completada: POST /auth/login - Tiempo: 0.89s
