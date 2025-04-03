@@ -6,7 +6,7 @@ import io
 import os
 import logging
 from config import VOICE_SIMILARITY_THRESHOLD
-from auth import get_current_user
+from auth.auth_utils import get_current_user
 from neo4j_client import Neo4jClient
 
 # Configurar logging

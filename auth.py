@@ -16,6 +16,7 @@ from neo4j_client import Neo4jClient
 from config import SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES, VOICE_SIMILARITY_THRESHOLD
 from voice_processing import extract_voice_embedding, compare_voice_embeddings
 from azure_storage import upload_voice_recording
+from auth.auth_utils import get_current_user
 
 # Configurar logging
 logging.basicConfig(
