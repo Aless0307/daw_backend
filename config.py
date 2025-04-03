@@ -23,6 +23,12 @@ logger.info("Cargando configuración de Neo4j...")
 NEO4J_MAX_RETRIES = int(os.getenv("NEO4J_MAX_RETRIES", "3"))
 NEO4J_RETRY_DELAY = int(os.getenv("NEO4J_RETRY_DELAY", "2"))
 
+# Configuración específica para Neo4j local
+NEO4J_MAX_CONNECTION_LIFETIME = int(os.getenv("NEO4J_MAX_CONNECTION_LIFETIME", "3600"))  # 1 hora
+NEO4J_MAX_CONNECTION_POOL_SIZE = int(os.getenv("NEO4J_MAX_CONNECTION_POOL_SIZE", "100"))
+NEO4J_CONNECTION_TIMEOUT = int(os.getenv("NEO4J_CONNECTION_TIMEOUT", "10"))
+NEO4J_KEEP_ALIVE = os.getenv("NEO4J_KEEP_ALIVE", "true").lower() == "true"
+
 # Verificar variables de entorno críticas
 if not all([NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD]):
     logger.error("Faltan variables de entorno críticas para Neo4j")
