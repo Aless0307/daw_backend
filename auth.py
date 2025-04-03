@@ -107,6 +107,8 @@ async def register(
                 # Extraer embedding de voz
                 voice_embedding = extract_voice_embedding(temp_file_path)
                 logger.info(f"Embedding de voz extraído para: {username}")
+                logger.info(f"Tipo de embedding: {type(voice_embedding)}")
+                logger.info(f"Forma del embedding: {voice_embedding.shape if hasattr(voice_embedding, 'shape') else 'No tiene shape'}")
                 
                 # Subir archivo a Azure Storage
                 voice_url = upload_voice_recording(content, f"{email}_{int(time.time())}.wav")
@@ -123,24 +125,30 @@ async def register(
         
         # Crear usuario en la base de datos
         hashed_password = get_password_hash(password)
-        success = neo4j_client.create_user_with_voice(
-            username=username,
-            email=email,
-            password=hashed_password,
-            voice_embedding=voice_embedding,
-            voice_url=voice_url
-        )
+        logger.info(f"Preparando datos para crear usuario: username={username}, email={email}, voice_embedding={'presente' if voice_embedding is not None else 'ausente'}")
         
-        if success:
-            process_time = time.time() - start_time
-            logger.info(f"Usuario registrado exitosamente: {username} ({email}) - Tiempo: {process_time:.2f}s")
-            return {"message": "Usuario registrado exitosamente"}
-        else:
-            logger.error(f"Error al crear usuario en la base de datos: {username} ({email})")
-            return JSONResponse(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content={"detail": "Error al crear el usuario"}
+        try:
+            success = neo4j_client.create_user_with_voice(
+                username=username,
+                email=email,
+                password=hashed_password,
+                voice_data=voice_url if voice_url else None,
+                voice_embedding=voice_embedding.tolist() if voice_embedding is not None else None
             )
+            
+            if success:
+                process_time = time.time() - start_time
+                logger.info(f"Usuario registrado exitosamente: {username} ({email}) - Tiempo: {process_time:.2f}s")
+                return {"message": "Usuario registrado exitosamente"}
+            else:
+                logger.error(f"Error al crear usuario en la base de datos: {username} ({email})")
+                return JSONResponse(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    content={"detail": "Error al crear el usuario"}
+                )
+        except Exception as e:
+            logger.error(f"Error al crear usuario: {str(e)}")
+            raise
             
     except Exception as e:
         logger.error(f"Error inesperado durante el registro: {str(e)}")
@@ -226,11 +234,27 @@ async def login_with_voice(
             
             # Obtener embedding almacenado
             stored_embedding = user.get("voice_embedding")
+            logger.info(f"Embedding almacenado: {'presente' if stored_embedding is not None else 'ausente'}")
+            if stored_embedding is not None:
+                logger.info(f"Tipo de embedding almacenado: {type(stored_embedding)}")
+                logger.info(f"Longitud del embedding almacenado: {len(stored_embedding) if isinstance(stored_embedding, (list, np.ndarray)) else 'No es una lista/array'}")
+            
             if not stored_embedding:
                 logger.warning(f"Usuario {email} no tiene embedding de voz almacenado")
                 return JSONResponse(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     content={"detail": "Usuario no tiene voz registrada"}
+                )
+            
+            # Convertir el embedding almacenado a numpy array
+            try:
+                stored_embedding = np.array(stored_embedding)
+                logger.info(f"Embedding convertido a numpy array, forma: {stored_embedding.shape}")
+            except Exception as e:
+                logger.error(f"Error al convertir embedding a numpy array: {str(e)}")
+                return JSONResponse(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    content={"detail": "Error al procesar el embedding de voz"}
                 )
             
             # Comparar embeddings

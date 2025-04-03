@@ -118,24 +118,40 @@ class Neo4jClient:
             logger.error(f"Error al obtener usuario por email: {str(e)}")
             raise
 
-    def create_user_with_voice(self, email: str, password: str, voice_data: str) -> Dict[str, Any]:
+    def create_user_with_voice(self, username: str, email: str, password: str, voice_data: str = None, voice_embedding: list = None) -> Dict[str, Any]:
         """Crea un nuevo usuario con datos de voz."""
+        logger.info(f"Creando usuario con voz: username={username}, email={email}, voice_embedding={'presente' if voice_embedding is not None else 'ausente'}")
+        
         query = """
         CREATE (u:User {
+            username: $username,
             email: $email,
             password: $password,
             voice_data: $voice_data,
+            voice_embedding: $voice_embedding,
             created_at: datetime()
         })
         RETURN u
         """
         try:
+            # Asegurarse de que el embedding sea una lista
+            if voice_embedding is not None:
+                if hasattr(voice_embedding, 'tolist'):
+                    voice_embedding = voice_embedding.tolist()
+                elif not isinstance(voice_embedding, list):
+                    voice_embedding = list(voice_embedding)
+                logger.info(f"Embedding convertido a lista, longitud: {len(voice_embedding)}")
+            
             results = self._execute_query(query, {
+                "username": username,
                 "email": email,
                 "password": password,
-                "voice_data": voice_data
+                "voice_data": voice_data,
+                "voice_embedding": voice_embedding
             })
+            
             if results:
+                logger.info(f"Usuario creado exitosamente: {username} ({email})")
                 return results[0]["u"]
             raise Exception("No se pudo crear el usuario")
         except Exception as e:

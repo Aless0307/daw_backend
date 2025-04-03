@@ -6,3 +6,543 @@
 2025-04-02 12:57:53,856 - __main__ - INFO - NEO4J_URI: neo4j+s://2908cbb6.databases.neo4j.io
 2025-04-02 12:57:53,856 - __main__ - INFO - Variables de entorno de Neo4j cargadas correctamente
 2025-04-02 12:57:53,856 - __main__ - INFO - Configuración final cargada correctamente
+2025-04-02 21:01:03,137 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:01:03,138 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:01:03,138 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:01:03,138 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:01:10,008 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:01:49,176 - main - INFO - Solicitud recibida: POST /auth/register - Cliente: 127.0.0.1
+2025-04-02 21:01:49,180 - auth - INFO - Iniciando registro de usuario: ale (ale@gmail.com)
+2025-04-02 21:01:49,182 - neo4j_client - ERROR - Error al verificar conexión (intento 1/3): Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [Errno 111] Connection refused)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [Errno 111] Connection refused)
+2025-04-02 21:01:51,184 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:01:51,185 - neo4j_client - ERROR - Error al verificar conexión (intento 2/3): Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [Errno 111] Connection refused)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [Errno 111] Connection refused)
+2025-04-02 21:01:53,187 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:01:53,188 - neo4j_client - ERROR - Error al verificar conexión (intento 3/3): Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [Errno 111] Connection refused)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [Errno 111] Connection refused)
+2025-04-02 21:01:53,189 - neo4j_client - ERROR - No se pudo establecer conexión con Neo4j local después de varios intentos
+2025-04-02 21:01:53,189 - neo4j_client - ERROR - Error al obtener usuario por email: No se pudo establecer conexión con Neo4j local
+2025-04-02 21:01:53,189 - auth - ERROR - Error inesperado durante el registro: No se pudo establecer conexión con Neo4j local
+2025-04-02 21:01:53,190 - main - INFO - Solicitud completada: POST /auth/register - Tiempo: 4.01s
+2025-04-02 21:03:19,618 - main - INFO - Solicitud recibida: POST /auth/register - Cliente: 127.0.0.1
+2025-04-02 21:03:19,621 - auth - INFO - Iniciando registro de usuario: ale (ale@gmail.com)
+2025-04-02 21:03:19,748 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:03:19,913 - auth - ERROR - Error inesperado durante el registro: Neo4jClient.create_user_with_voice() got an unexpected keyword argument 'username'
+2025-04-02 21:03:19,914 - main - INFO - Solicitud completada: POST /auth/register - Tiempo: 0.30s
+2025-04-02 21:03:43,131 - main - INFO - Solicitud recibida: POST /auth/register - Cliente: 127.0.0.1
+2025-04-02 21:03:43,135 - auth - INFO - Iniciando registro de usuario: ale (ale@gmail.com)
+2025-04-02 21:03:43,165 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:03:43,186 - auth - INFO - Procesando archivo de voz para: ale
+2025-04-02 21:03:43,188 - voice_processing - INFO - Iniciando extracción de embedding para archivo: /tmp/tmpise1ihym.wav
+2025-04-02 21:03:43,188 - voice_processing - INFO - Cargando archivo de audio...
+2025-04-02 21:03:44,294 - voice_processing - INFO - Audio cargado. Duración: 1.48s, Sample rate: 16000Hz
+2025-04-02 21:03:44,294 - voice_processing - INFO - Preprocesando audio...
+2025-04-02 21:03:44,299 - voice_processing - INFO - Audio preprocesado correctamente
+2025-04-02 21:03:44,299 - voice_processing - INFO - Inicializando encoder de voz...
+2025-04-02 21:03:44,410 - voice_processing - INFO - Extrayendo embedding...
+2025-04-02 21:03:44,575 - voice_processing - INFO - Embedding extraído. Dimensión: 256
+2025-04-02 21:03:44,577 - auth - INFO - Embedding de voz extraído para: ale
+2025-04-02 21:03:44,577 - azure_storage - INFO - Iniciando subida de archivo a Azure Storage: voice_recordings/ale@gmail.com_1743649424.wav_20250403_030344_c6eb5a08-b800-427e-bb71-af522a10b5fa.wav
+2025-04-02 21:03:44,577 - azure_storage - INFO - Conectando a Azure Blob Storage
+2025-04-02 21:03:44,584 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw?restype=REDACTED'
+Request method: 'GET'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '4127f97c-1038-11f0-9b3f-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-02 21:03:44,997 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '0'
+    'Last-Modified': 'Sun, 30 Mar 2025 18:02:03 GMT'
+    'ETag': '"0x8DD6FB4FA1C5DEF"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '61dbf25b-301e-0077-1245-a4a946000000'
+    'x-ms-client-request-id': '4127f97c-1038-11f0-9b3f-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-has-immutability-policy': 'REDACTED'
+    'x-ms-has-legal-hold': 'REDACTED'
+    'x-ms-immutable-storage-with-versioning-enabled': 'REDACTED'
+    'x-ms-blob-public-access': 'REDACTED'
+    'x-ms-default-encryption-scope': 'REDACTED'
+    'x-ms-deny-encryption-scope-override': 'REDACTED'
+    'Date': 'Thu, 03 Apr 2025 03:03:44 GMT'
+2025-04-02 21:03:44,999 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/ale%40gmail.com_1743649424.wav_20250403_030344_c6eb5a08-b800-427e-bb71-af522a10b5fa.wav'
+Request method: 'PUT'
+Request headers:
+    'Content-Length': '20346'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-blob-content-type': 'REDACTED'
+    'x-ms-blob-content-disposition': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Content-Type': 'application/octet-stream'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '41675d74-1038-11f0-9b3f-76ca83979ddd'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+2025-04-02 21:03:45,147 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 201
+Response headers:
+    'Content-Length': '0'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Thu, 03 Apr 2025 03:03:45 GMT'
+    'ETag': '"0x8DD725C25A9FD41"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '61dbf26b-301e-0077-1e45-a4a946000000'
+    'x-ms-client-request-id': '41675d74-1038-11f0-9b3f-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-content-crc64': 'REDACTED'
+    'x-ms-request-server-encrypted': 'REDACTED'
+    'Date': 'Thu, 03 Apr 2025 03:03:44 GMT'
+2025-04-02 21:03:45,148 - azure_storage - INFO - Archivo subido exitosamente a Azure Storage: voice_recordings/ale@gmail.com_1743649424.wav_20250403_030344_c6eb5a08-b800-427e-bb71-af522a10b5fa.wav
+2025-04-02 21:03:45,148 - azure_storage - INFO - URL de Azure generada: https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/ale@gmail.com_1743649424.wav_20250403_030344_c6eb5a08-b800-427e-bb71-af522a10b5fa.wav
+2025-04-02 21:03:45,149 - auth - INFO - Archivo de voz subido a Azure: https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/ale@gmail.com_1743649424.wav_20250403_030344_c6eb5a08-b800-427e-bb71-af522a10b5fa.wav?st=2025-04-03T02%3A58%3A45Z&se=2026-04-03T03%3A03%3A45Z&sp=r&sv=2025-05-05&sr=b&sig=bhGxI1tlno6G7zN9P1zP0GCdOSrc1hL3n6AXNFFRNqQ%3D
+2025-04-02 21:03:45,149 - auth - ERROR - Error inesperado durante el registro: Neo4jClient.create_user_with_voice() got an unexpected keyword argument 'username'
+2025-04-02 21:03:45,150 - main - INFO - Solicitud completada: POST /auth/register - Tiempo: 2.02s
+2025-04-02 21:03:52,158 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:03:52,158 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:03:52,158 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:03:52,158 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:03:56,441 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:05:15,275 - main - INFO - Solicitud recibida: POST /auth/register - Cliente: 127.0.0.1
+2025-04-02 21:05:15,279 - auth - INFO - Iniciando registro de usuario: ale (ale@gmail.com)
+2025-04-02 21:05:15,317 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:05:15,335 - auth - ERROR - Error inesperado durante el registro: Neo4jClient.create_user_with_voice() got an unexpected keyword argument 'username'
+2025-04-02 21:05:15,336 - main - INFO - Solicitud completada: POST /auth/register - Tiempo: 0.06s
+2025-04-02 21:05:47,831 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:05:47,831 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:05:47,832 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:05:47,832 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:05:52,301 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:05:57,460 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:05:57,460 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:05:57,460 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:05:57,460 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:06:01,787 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:06:05,981 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:06:05,981 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:06:05,982 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:06:05,982 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:06:10,262 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:06:18,258 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:06:18,258 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:06:18,258 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:06:18,258 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:06:22,217 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:06:26,915 - main - INFO - Solicitud recibida: POST /auth/register - Cliente: 127.0.0.1
+2025-04-02 21:06:26,919 - auth - INFO - Iniciando registro de usuario: ale (ale@gmail.com)
+2025-04-02 21:06:26,952 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:06:26,987 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:06:27,595 - neo4j_client - INFO - Usuario creado exitosamente: ale (ale@gmail.com)
+2025-04-02 21:06:27,595 - auth - INFO - Usuario registrado exitosamente: ale (ale@gmail.com) - Tiempo: 0.68s
+2025-04-02 21:06:27,596 - main - INFO - Solicitud completada: POST /auth/register - Tiempo: 0.68s
+2025-04-02 21:06:35,038 - main - INFO - Solicitud recibida: POST /auth/login - Cliente: 127.0.0.1
+2025-04-02 21:06:35,064 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:06:35,207 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:06:35,328 - auth - INFO - Creando token de acceso para: ale@gmail.com
+2025-04-02 21:06:35,330 - main - INFO - Solicitud completada: POST /auth/login - Tiempo: 0.29s
+2025-04-02 21:07:01,085 - main - INFO - Solicitud recibida: POST /auth/register - Cliente: 127.0.0.1
+2025-04-02 21:07:01,088 - auth - INFO - Iniciando registro de usuario: aleconvoz (aleconvoz@gmail.com)
+2025-04-02 21:07:01,107 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:07:01,124 - auth - INFO - Procesando archivo de voz para: aleconvoz
+2025-04-02 21:07:01,125 - voice_processing - INFO - Iniciando extracción de embedding para archivo: /tmp/tmp52x51pn5.wav
+2025-04-02 21:07:01,126 - voice_processing - INFO - Cargando archivo de audio...
+2025-04-02 21:07:02,234 - voice_processing - INFO - Audio cargado. Duración: 3.59s, Sample rate: 16000Hz
+2025-04-02 21:07:02,234 - voice_processing - INFO - Preprocesando audio...
+2025-04-02 21:07:02,244 - voice_processing - INFO - Audio preprocesado correctamente
+2025-04-02 21:07:02,244 - voice_processing - INFO - Inicializando encoder de voz...
+2025-04-02 21:07:02,291 - voice_processing - INFO - Extrayendo embedding...
+2025-04-02 21:07:02,493 - voice_processing - INFO - Embedding extraído. Dimensión: 256
+2025-04-02 21:07:02,494 - auth - INFO - Embedding de voz extraído para: aleconvoz
+2025-04-02 21:07:02,495 - azure_storage - INFO - Iniciando subida de archivo a Azure Storage: voice_recordings/aleconvoz@gmail.com_1743649622.wav_20250403_030702_02a4be1f-d357-4c27-9e5b-86018463c105.wav
+2025-04-02 21:07:02,495 - azure_storage - INFO - Conectando a Azure Blob Storage
+2025-04-02 21:07:02,500 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw?restype=REDACTED'
+Request method: 'GET'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'b71fa3f0-1038-11f0-9fc7-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-02 21:07:02,870 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '0'
+    'Last-Modified': 'Sun, 30 Mar 2025 18:02:03 GMT'
+    'ETag': '"0x8DD6FB4FA1C5DEF"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '48165ae4-501e-0061-5c45-a45f91000000'
+    'x-ms-client-request-id': 'b71fa3f0-1038-11f0-9fc7-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-has-immutability-policy': 'REDACTED'
+    'x-ms-has-legal-hold': 'REDACTED'
+    'x-ms-immutable-storage-with-versioning-enabled': 'REDACTED'
+    'x-ms-blob-public-access': 'REDACTED'
+    'x-ms-default-encryption-scope': 'REDACTED'
+    'x-ms-deny-encryption-scope-override': 'REDACTED'
+    'Date': 'Thu, 03 Apr 2025 03:07:02 GMT'
+2025-04-02 21:07:02,872 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/aleconvoz%40gmail.com_1743649622.wav_20250403_030702_02a4be1f-d357-4c27-9e5b-86018463c105.wav'
+Request method: 'PUT'
+Request headers:
+    'Content-Length': '54326'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-blob-content-type': 'REDACTED'
+    'x-ms-blob-content-disposition': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Content-Type': 'application/octet-stream'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'b75865d2-1038-11f0-9fc7-76ca83979ddd'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+2025-04-02 21:07:03,098 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 201
+Response headers:
+    'Content-Length': '0'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Thu, 03 Apr 2025 03:07:03 GMT'
+    'ETag': '"0x8DD725C9BA68DB1"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '48165b08-501e-0061-7845-a45f91000000'
+    'x-ms-client-request-id': 'b75865d2-1038-11f0-9fc7-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-content-crc64': 'REDACTED'
+    'x-ms-request-server-encrypted': 'REDACTED'
+    'Date': 'Thu, 03 Apr 2025 03:07:02 GMT'
+2025-04-02 21:07:03,099 - azure_storage - INFO - Archivo subido exitosamente a Azure Storage: voice_recordings/aleconvoz@gmail.com_1743649622.wav_20250403_030702_02a4be1f-d357-4c27-9e5b-86018463c105.wav
+2025-04-02 21:07:03,100 - azure_storage - INFO - URL de Azure generada: https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/aleconvoz@gmail.com_1743649622.wav_20250403_030702_02a4be1f-d357-4c27-9e5b-86018463c105.wav
+2025-04-02 21:07:03,100 - auth - INFO - Archivo de voz subido a Azure: https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/aleconvoz@gmail.com_1743649622.wav_20250403_030702_02a4be1f-d357-4c27-9e5b-86018463c105.wav?st=2025-04-03T03%3A02%3A03Z&se=2026-04-03T03%3A07%3A03Z&sp=r&sv=2025-05-05&sr=b&sig=8xHWNdLTvpdikstlO/UPpFA8ZCew8zHo7lrx06EHbaY%3D
+2025-04-02 21:07:03,121 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:07:03,209 - neo4j_client - INFO - Usuario creado exitosamente: aleconvoz (aleconvoz@gmail.com)
+2025-04-02 21:07:03,210 - auth - INFO - Usuario registrado exitosamente: aleconvoz (aleconvoz@gmail.com) - Tiempo: 2.12s
+2025-04-02 21:07:03,211 - main - INFO - Solicitud completada: POST /auth/register - Tiempo: 2.13s
+2025-04-02 21:07:14,454 - main - INFO - Solicitud recibida: POST /auth/login-voice - Cliente: 127.0.0.1
+2025-04-02 21:07:14,457 - auth - INFO - Iniciando login con voz para email: aleconvoz@gmail.com
+2025-04-02 21:07:14,474 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:07:14,497 - auth - INFO - Procesando archivo de voz para: aleconvoz@gmail.com
+2025-04-02 21:07:14,498 - auth - INFO - Extrayendo embedding de la voz
+2025-04-02 21:07:14,498 - voice_processing - INFO - Iniciando extracción de embedding para archivo: /tmp/tmp7ebws_w6.wav
+2025-04-02 21:07:14,498 - voice_processing - INFO - Cargando archivo de audio...
+2025-04-02 21:07:14,628 - voice_processing - INFO - Audio cargado. Duración: 2.49s, Sample rate: 16000Hz
+2025-04-02 21:07:14,628 - voice_processing - INFO - Preprocesando audio...
+2025-04-02 21:07:14,637 - voice_processing - INFO - Audio preprocesado correctamente
+2025-04-02 21:07:14,637 - voice_processing - INFO - Inicializando encoder de voz...
+2025-04-02 21:07:14,719 - voice_processing - INFO - Extrayendo embedding...
+2025-04-02 21:07:14,824 - voice_processing - INFO - Embedding extraído. Dimensión: 256
+2025-04-02 21:07:14,825 - auth - WARNING - Usuario aleconvoz@gmail.com no tiene embedding de voz almacenado
+2025-04-02 21:07:14,826 - main - INFO - Solicitud completada: POST /auth/login-voice - Tiempo: 0.37s
+2025-04-02 21:07:25,357 - main - INFO - Solicitud recibida: POST /auth/login - Cliente: 127.0.0.1
+2025-04-02 21:07:25,411 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:07:25,448 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:07:25,467 - auth - INFO - Creando token de acceso para: ale@gmail.com
+2025-04-02 21:07:25,468 - main - INFO - Solicitud completada: POST /auth/login - Tiempo: 0.11s
+2025-04-02 21:07:37,093 - main - INFO - Solicitud recibida: POST /auth/login-voice - Cliente: 127.0.0.1
+2025-04-02 21:07:37,095 - auth - INFO - Iniciando login con voz para email: ale@gmail.com
+2025-04-02 21:07:37,112 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:07:37,136 - auth - INFO - Procesando archivo de voz para: ale@gmail.com
+2025-04-02 21:07:37,137 - auth - INFO - Extrayendo embedding de la voz
+2025-04-02 21:07:37,137 - voice_processing - INFO - Iniciando extracción de embedding para archivo: /tmp/tmpnbkirt09.wav
+2025-04-02 21:07:37,137 - voice_processing - INFO - Cargando archivo de audio...
+2025-04-02 21:07:37,267 - voice_processing - INFO - Audio cargado. Duración: 2.00s, Sample rate: 16000Hz
+2025-04-02 21:07:37,267 - voice_processing - INFO - Preprocesando audio...
+2025-04-02 21:07:37,275 - voice_processing - INFO - Audio preprocesado correctamente
+2025-04-02 21:07:37,275 - voice_processing - INFO - Inicializando encoder de voz...
+2025-04-02 21:07:37,308 - voice_processing - INFO - Extrayendo embedding...
+2025-04-02 21:07:37,486 - voice_processing - INFO - Embedding extraído. Dimensión: 256
+2025-04-02 21:07:37,487 - auth - WARNING - Usuario ale@gmail.com no tiene embedding de voz almacenado
+2025-04-02 21:07:37,489 - main - INFO - Solicitud completada: POST /auth/login-voice - Tiempo: 0.40s
+2025-04-02 21:13:45,966 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:13:45,968 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:13:45,968 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:13:45,969 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:13:49,927 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:14:10,953 - main - INFO - Solicitud recibida: POST /auth/register - Cliente: 127.0.0.1
+2025-04-02 21:14:10,956 - auth - INFO - Iniciando registro de usuario: asdasd (asdasd@gmail.com)
+2025-04-02 21:14:11,003 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:14:11,019 - auth - INFO - Procesando archivo de voz para: asdasd
+2025-04-02 21:14:11,020 - voice_processing - INFO - Iniciando extracción de embedding para archivo: /tmp/tmp49mxb6lr.wav
+2025-04-02 21:14:11,021 - voice_processing - INFO - Cargando archivo de audio...
+2025-04-02 21:14:12,015 - voice_processing - INFO - Audio cargado. Duración: 1.97s, Sample rate: 16000Hz
+2025-04-02 21:14:12,015 - voice_processing - INFO - Preprocesando audio...
+2025-04-02 21:14:12,021 - voice_processing - INFO - Audio preprocesado correctamente
+2025-04-02 21:14:12,021 - voice_processing - INFO - Inicializando encoder de voz...
+2025-04-02 21:14:12,071 - voice_processing - INFO - Extrayendo embedding...
+2025-04-02 21:14:12,227 - voice_processing - INFO - Embedding extraído. Dimensión: 256
+2025-04-02 21:14:12,227 - auth - INFO - Embedding de voz extraído para: asdasd
+2025-04-02 21:14:12,228 - azure_storage - INFO - Iniciando subida de archivo a Azure Storage: voice_recordings/asdasd@gmail.com_1743650052.wav_20250403_031412_83f942d6-3c77-4b34-9e27-1a1396f090f5.wav
+2025-04-02 21:14:12,228 - azure_storage - INFO - Conectando a Azure Blob Storage
+2025-04-02 21:14:12,233 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw?restype=REDACTED'
+Request method: 'GET'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'b743afe2-1039-11f0-aa6f-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-02 21:14:12,605 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '0'
+    'Last-Modified': 'Sun, 30 Mar 2025 18:02:03 GMT'
+    'ETag': '"0x8DD6FB4FA1C5DEF"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '3d543944-c01e-005c-6646-a4298a000000'
+    'x-ms-client-request-id': 'b743afe2-1039-11f0-aa6f-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-has-immutability-policy': 'REDACTED'
+    'x-ms-has-legal-hold': 'REDACTED'
+    'x-ms-immutable-storage-with-versioning-enabled': 'REDACTED'
+    'x-ms-blob-public-access': 'REDACTED'
+    'x-ms-default-encryption-scope': 'REDACTED'
+    'x-ms-deny-encryption-scope-override': 'REDACTED'
+    'Date': 'Thu, 03 Apr 2025 03:14:12 GMT'
+2025-04-02 21:14:12,609 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/asdasd%40gmail.com_1743650052.wav_20250403_031412_83f942d6-3c77-4b34-9e27-1a1396f090f5.wav'
+Request method: 'PUT'
+Request headers:
+    'Content-Length': '27924'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-blob-content-type': 'REDACTED'
+    'x-ms-blob-content-disposition': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Content-Type': 'application/octet-stream'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'b77cf0ea-1039-11f0-aa6f-76ca83979ddd'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+2025-04-02 21:14:12,757 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 201
+Response headers:
+    'Content-Length': '0'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Thu, 03 Apr 2025 03:14:12 GMT'
+    'ETag': '"0x8DD725D9BBFCAE1"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '3d543971-c01e-005c-0e46-a4298a000000'
+    'x-ms-client-request-id': 'b77cf0ea-1039-11f0-aa6f-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-content-crc64': 'REDACTED'
+    'x-ms-request-server-encrypted': 'REDACTED'
+    'Date': 'Thu, 03 Apr 2025 03:14:12 GMT'
+2025-04-02 21:14:12,758 - azure_storage - INFO - Archivo subido exitosamente a Azure Storage: voice_recordings/asdasd@gmail.com_1743650052.wav_20250403_031412_83f942d6-3c77-4b34-9e27-1a1396f090f5.wav
+2025-04-02 21:14:12,758 - azure_storage - INFO - URL de Azure generada: https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/asdasd@gmail.com_1743650052.wav_20250403_031412_83f942d6-3c77-4b34-9e27-1a1396f090f5.wav
+2025-04-02 21:14:12,759 - auth - INFO - Archivo de voz subido a Azure: https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/asdasd@gmail.com_1743650052.wav_20250403_031412_83f942d6-3c77-4b34-9e27-1a1396f090f5.wav?st=2025-04-03T03%3A09%3A12Z&se=2026-04-03T03%3A14%3A12Z&sp=r&sv=2025-05-05&sr=b&sig=Ih0b5cdA3oYQXYIdx6SCi%2Bu7Mlr0AdESb5bUWpMNd5o%3D
+2025-04-02 21:14:12,774 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:14:12,800 - neo4j_client - INFO - Usuario creado exitosamente: asdasd (asdasd@gmail.com)
+2025-04-02 21:14:12,800 - auth - INFO - Usuario registrado exitosamente: asdasd (asdasd@gmail.com) - Tiempo: 1.84s
+2025-04-02 21:14:12,802 - main - INFO - Solicitud completada: POST /auth/register - Tiempo: 1.85s
+2025-04-02 21:15:09,635 - main - INFO - Solicitud recibida: POST /auth/login-voice - Cliente: 127.0.0.1
+2025-04-02 21:15:09,639 - auth - INFO - Iniciando login con voz para email: asdasd@gmail.com
+2025-04-02 21:15:09,661 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:15:09,765 - auth - INFO - Procesando archivo de voz para: asdasd@gmail.com
+2025-04-02 21:15:09,766 - auth - INFO - Extrayendo embedding de la voz
+2025-04-02 21:15:09,766 - voice_processing - INFO - Iniciando extracción de embedding para archivo: /tmp/tmpxrx06x1w.wav
+2025-04-02 21:15:09,766 - voice_processing - INFO - Cargando archivo de audio...
+2025-04-02 21:15:09,886 - voice_processing - INFO - Audio cargado. Duración: 1.98s, Sample rate: 16000Hz
+2025-04-02 21:15:09,886 - voice_processing - INFO - Preprocesando audio...
+2025-04-02 21:15:09,893 - voice_processing - INFO - Audio preprocesado correctamente
+2025-04-02 21:15:09,893 - voice_processing - INFO - Inicializando encoder de voz...
+2025-04-02 21:15:10,066 - voice_processing - INFO - Extrayendo embedding...
+2025-04-02 21:15:10,335 - voice_processing - INFO - Embedding extraído. Dimensión: 256
+2025-04-02 21:15:10,336 - auth - WARNING - Usuario asdasd@gmail.com no tiene embedding de voz almacenado
+2025-04-02 21:15:10,338 - main - INFO - Solicitud completada: POST /auth/login-voice - Tiempo: 0.70s
+2025-04-02 21:15:47,127 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:15:47,128 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:15:47,128 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:15:47,128 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:15:52,028 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:15:54,076 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:15:54,076 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:15:54,077 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:15:54,077 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:15:58,555 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:16:00,897 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:16:00,897 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:16:00,897 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:16:00,897 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:16:05,128 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:16:11,425 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:16:11,425 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:16:11,425 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:16:11,425 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:16:15,386 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:16:37,702 - main - INFO - Solicitud recibida: POST /auth/login-voice - Cliente: 127.0.0.1
+2025-04-02 21:16:37,705 - auth - INFO - Iniciando login con voz para email: aleconvoz@gmail.com
+2025-04-02 21:16:37,730 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:16:37,746 - auth - INFO - Procesando archivo de voz para: aleconvoz@gmail.com
+2025-04-02 21:16:37,747 - auth - INFO - Extrayendo embedding de la voz
+2025-04-02 21:16:37,747 - voice_processing - INFO - Iniciando extracción de embedding para archivo: /tmp/tmp7ucgit0q.wav
+2025-04-02 21:16:37,747 - voice_processing - INFO - Cargando archivo de audio...
+2025-04-02 21:16:38,781 - voice_processing - INFO - Audio cargado. Duración: 2.35s, Sample rate: 16000Hz
+2025-04-02 21:16:38,781 - voice_processing - INFO - Preprocesando audio...
+2025-04-02 21:16:38,788 - voice_processing - INFO - Audio preprocesado correctamente
+2025-04-02 21:16:38,788 - voice_processing - INFO - Inicializando encoder de voz...
+2025-04-02 21:16:38,879 - voice_processing - INFO - Extrayendo embedding...
+2025-04-02 21:16:39,026 - voice_processing - INFO - Embedding extraído. Dimensión: 256
+2025-04-02 21:16:39,026 - auth - WARNING - Usuario aleconvoz@gmail.com no tiene embedding de voz almacenado
+2025-04-02 21:16:39,027 - main - INFO - Solicitud completada: POST /auth/login-voice - Tiempo: 1.33s
+2025-04-02 21:17:01,938 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:17:01,938 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:17:01,938 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:17:01,939 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:17:06,289 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:17:19,104 - main - INFO - Solicitud recibida: POST /auth/login-voice - Cliente: 127.0.0.1
+2025-04-02 21:17:19,106 - auth - INFO - Iniciando login con voz para email: asdasd@gmail.com
+2025-04-02 21:17:19,132 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:17:19,152 - auth - INFO - Procesando archivo de voz para: asdasd@gmail.com
+2025-04-02 21:17:19,152 - auth - INFO - Extrayendo embedding de la voz
+2025-04-02 21:17:19,153 - voice_processing - INFO - Iniciando extracción de embedding para archivo: /tmp/tmp26ew8g7v.wav
+2025-04-02 21:17:19,153 - voice_processing - INFO - Cargando archivo de audio...
+2025-04-02 21:17:20,189 - voice_processing - INFO - Audio cargado. Duración: 1.02s, Sample rate: 16000Hz
+2025-04-02 21:17:20,189 - voice_processing - INFO - Preprocesando audio...
+2025-04-02 21:17:20,192 - voice_processing - INFO - Audio preprocesado correctamente
+2025-04-02 21:17:20,192 - voice_processing - INFO - Inicializando encoder de voz...
+2025-04-02 21:17:20,265 - voice_processing - INFO - Extrayendo embedding...
+2025-04-02 21:17:20,398 - voice_processing - INFO - Embedding extraído. Dimensión: 256
+2025-04-02 21:17:20,398 - auth - WARNING - Usuario asdasd@gmail.com no tiene embedding de voz almacenado
+2025-04-02 21:17:20,400 - main - INFO - Solicitud completada: POST /auth/login-voice - Tiempo: 1.30s
+2025-04-02 21:17:49,825 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:17:49,825 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:17:49,825 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:17:49,826 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:17:54,181 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:17:59,244 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:17:59,244 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:17:59,244 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:17:59,245 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:18:03,437 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:18:07,370 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:18:07,370 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:18:07,370 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:18:07,370 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:18:11,386 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:18:22,431 - config - INFO - Cargando configuración de Neo4j...
+2025-04-02 21:18:22,431 - config - INFO - NEO4J_URI: bolt://localhost:7687
+2025-04-02 21:18:22,431 - config - INFO - Variables de entorno de Neo4j cargadas correctamente
+2025-04-02 21:18:22,431 - config - INFO - Configuración final cargada correctamente
+2025-04-02 21:18:26,434 - neo4j_client - INFO - Conexión a Neo4j local establecida correctamente
+2025-04-02 21:18:36,507 - main - INFO - Solicitud recibida: POST /auth/register - Cliente: 127.0.0.1
+2025-04-02 21:18:36,510 - auth - INFO - Iniciando registro de usuario: alessandro (alessandroah77@gmail.com)
+2025-04-02 21:18:36,538 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:18:36,555 - auth - INFO - Procesando archivo de voz para: alessandro
+2025-04-02 21:18:36,555 - voice_processing - INFO - Iniciando extracción de embedding para archivo: /tmp/tmp_j2yegqg.wav
+2025-04-02 21:18:36,556 - voice_processing - INFO - Cargando archivo de audio...
+2025-04-02 21:18:37,658 - voice_processing - INFO - Audio cargado. Duración: 3.54s, Sample rate: 16000Hz
+2025-04-02 21:18:37,658 - voice_processing - INFO - Preprocesando audio...
+2025-04-02 21:18:37,667 - voice_processing - INFO - Audio preprocesado correctamente
+2025-04-02 21:18:37,668 - voice_processing - INFO - Inicializando encoder de voz...
+2025-04-02 21:18:37,710 - voice_processing - INFO - Extrayendo embedding...
+2025-04-02 21:18:37,852 - voice_processing - INFO - Embedding extraído. Dimensión: 256
+2025-04-02 21:18:37,852 - auth - INFO - Embedding de voz extraído para: alessandro
+2025-04-02 21:18:37,853 - auth - INFO - Tipo de embedding: <class 'numpy.ndarray'>
+2025-04-02 21:18:37,853 - auth - INFO - Forma del embedding: (256,)
+2025-04-02 21:18:37,853 - azure_storage - INFO - Iniciando subida de archivo a Azure Storage: voice_recordings/alessandroah77@gmail.com_1743650317.wav_20250403_031837_b0347a84-c563-48a9-9b5d-8173d8fcf61e.wav
+2025-04-02 21:18:37,853 - azure_storage - INFO - Conectando a Azure Blob Storage
+2025-04-02 21:18:37,861 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw?restype=REDACTED'
+Request method: 'GET'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '559742c6-103a-11f0-adb8-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-02 21:18:38,210 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '0'
+    'Last-Modified': 'Sun, 30 Mar 2025 18:02:03 GMT'
+    'ETag': '"0x8DD6FB4FA1C5DEF"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '0b5a2517-d01e-001d-2747-a4716e000000'
+    'x-ms-client-request-id': '559742c6-103a-11f0-adb8-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-has-immutability-policy': 'REDACTED'
+    'x-ms-has-legal-hold': 'REDACTED'
+    'x-ms-immutable-storage-with-versioning-enabled': 'REDACTED'
+    'x-ms-blob-public-access': 'REDACTED'
+    'x-ms-default-encryption-scope': 'REDACTED'
+    'x-ms-deny-encryption-scope-override': 'REDACTED'
+    'Date': 'Thu, 03 Apr 2025 03:18:37 GMT'
+2025-04-02 21:18:38,213 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/alessandroah77%40gmail.com_1743650317.wav_20250403_031837_b0347a84-c563-48a9-9b5d-8173d8fcf61e.wav'
+Request method: 'PUT'
+Request headers:
+    'Content-Length': '54043'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-blob-content-type': 'REDACTED'
+    'x-ms-blob-content-disposition': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Content-Type': 'application/octet-stream'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '55ccf4ac-103a-11f0-adb8-76ca83979ddd'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+2025-04-02 21:18:38,440 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 201
+Response headers:
+    'Content-Length': '0'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Thu, 03 Apr 2025 03:18:38 GMT'
+    'ETag': '"0x8DD725E3A1B50AA"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '0b5a253a-d01e-001d-4747-a4716e000000'
+    'x-ms-client-request-id': '55ccf4ac-103a-11f0-adb8-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-content-crc64': 'REDACTED'
+    'x-ms-request-server-encrypted': 'REDACTED'
+    'Date': 'Thu, 03 Apr 2025 03:18:38 GMT'
+2025-04-02 21:18:38,440 - azure_storage - INFO - Archivo subido exitosamente a Azure Storage: voice_recordings/alessandroah77@gmail.com_1743650317.wav_20250403_031837_b0347a84-c563-48a9-9b5d-8173d8fcf61e.wav
+2025-04-02 21:18:38,441 - azure_storage - INFO - URL de Azure generada: https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/alessandroah77@gmail.com_1743650317.wav_20250403_031837_b0347a84-c563-48a9-9b5d-8173d8fcf61e.wav
+2025-04-02 21:18:38,441 - auth - INFO - Archivo de voz subido a Azure: https://proyectodawalessandro.blob.core.windows.net/daw/voice_recordings/alessandroah77@gmail.com_1743650317.wav_20250403_031837_b0347a84-c563-48a9-9b5d-8173d8fcf61e.wav?st=2025-04-03T03%3A13%3A38Z&se=2026-04-03T03%3A18%3A38Z&sp=r&sv=2025-05-05&sr=b&sig=IfNPkwCZvjR0W3sasocDJnSPBwuGkOX8t5m3NcV%2BiuE%3D
+2025-04-02 21:18:38,442 - auth - INFO - Preparando datos para crear usuario: username=alessandro, email=alessandroah77@gmail.com, voice_embedding=presente
+2025-04-02 21:18:38,442 - neo4j_client - INFO - Creando usuario con voz: username=alessandro, email=alessandroah77@gmail.com, voice_embedding=presente
+2025-04-02 21:18:38,442 - neo4j_client - INFO - Embedding convertido a lista, longitud: 256
+2025-04-02 21:18:38,457 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:18:38,557 - neo4j_client - INFO - Usuario creado exitosamente: alessandro (alessandroah77@gmail.com)
+2025-04-02 21:18:38,557 - auth - INFO - Usuario registrado exitosamente: alessandro (alessandroah77@gmail.com) - Tiempo: 2.05s
+2025-04-02 21:18:38,558 - main - INFO - Solicitud completada: POST /auth/register - Tiempo: 2.05s
+2025-04-02 21:18:49,722 - main - INFO - Solicitud recibida: POST /auth/login-voice - Cliente: 127.0.0.1
+2025-04-02 21:18:49,724 - auth - INFO - Iniciando login con voz para email: alessandroah77@gmail.com
+2025-04-02 21:18:49,740 - neo4j_client - INFO - Conexión a Neo4j local verificada correctamente
+2025-04-02 21:18:49,760 - auth - INFO - Procesando archivo de voz para: alessandroah77@gmail.com
+2025-04-02 21:18:49,761 - auth - INFO - Extrayendo embedding de la voz
+2025-04-02 21:18:49,761 - voice_processing - INFO - Iniciando extracción de embedding para archivo: /tmp/tmp8r16iucz.wav
+2025-04-02 21:18:49,761 - voice_processing - INFO - Cargando archivo de audio...
+2025-04-02 21:18:49,928 - voice_processing - INFO - Audio cargado. Duración: 2.82s, Sample rate: 16000Hz
+2025-04-02 21:18:49,929 - voice_processing - INFO - Preprocesando audio...
+2025-04-02 21:18:49,937 - voice_processing - INFO - Audio preprocesado correctamente
+2025-04-02 21:18:49,937 - voice_processing - INFO - Inicializando encoder de voz...
+2025-04-02 21:18:49,971 - voice_processing - INFO - Extrayendo embedding...
+2025-04-02 21:18:50,113 - voice_processing - INFO - Embedding extraído. Dimensión: 256
+2025-04-02 21:18:50,113 - auth - INFO - Embedding almacenado: presente
+2025-04-02 21:18:50,115 - auth - INFO - Tipo de embedding almacenado: <class 'list'>
+2025-04-02 21:18:50,116 - auth - INFO - Longitud del embedding almacenado: 256
+2025-04-02 21:18:50,117 - auth - INFO - Embedding convertido a numpy array, forma: (256,)
+2025-04-02 21:18:50,117 - auth - INFO - Comparando embeddings de voz
+2025-04-02 21:18:50,117 - voice_processing - INFO - Iniciando comparación de embeddings
+2025-04-02 21:18:50,117 - voice_processing - INFO - Umbral de similitud: 0.75
+2025-04-02 21:18:50,117 - voice_processing - INFO - Similitud calculada: 0.8567
+2025-04-02 21:18:50,117 - auth - INFO - Similitud de voz: 0.856702376739494
+2025-04-02 21:18:50,117 - auth - INFO - Creando token de acceso para: alessandroah77@gmail.com
+2025-04-02 21:18:50,117 - auth - INFO - Creando token de acceso para: alessandroah77@gmail.com
+2025-04-02 21:18:50,118 - auth - INFO - Login con voz completado para alessandroah77@gmail.com. Tiempo: 0.39s
+2025-04-02 21:18:50,119 - main - INFO - Solicitud completada: POST /auth/login-voice - Tiempo: 0.40s
