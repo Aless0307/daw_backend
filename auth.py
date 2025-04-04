@@ -1,22 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File, Form
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from typing import Optional, Dict, List, Any
-from datetime import datetime, timedelta
-import jwt
-import os
-import tempfile
-import time
+from datetime import timedelta
+from typing import Optional, Dict
 import logging
 import hashlib
-import numpy as np
-import io
-from neo4j_client import Neo4jClient
+import os
+from utils.auth_utils import create_access_token, get_current_user
+from mongodb_client import MongoDBClient
+from voice_processing import extract_embedding, compare_voices
+from azure_storage import upload_voice_recording, download_voice_recording
 from config import SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES, VOICE_SIMILARITY_THRESHOLD
-from voice_processing import extract_voice_embedding, compare_voice_embeddings
-from azure_storage import upload_voice_recording
-from auth.auth_utils import get_current_user
+from pydantic import BaseModel
+import librosa
+import numpy as np
 
 # Configurar logging
 logging.basicConfig(
@@ -30,154 +27,121 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+mongo_client = MongoDBClient()
 
-# Modelos
 class Token(BaseModel):
     access_token: str
     token_type: str
-    username: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
     email: str
+    voice_url: Optional[str] = None
 
-class UserBase(BaseModel):
-    username: str
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str
+    username: Optional[str] = None
     email: str
+    voice_url: Optional[str] = None
 
-class UserCreate(UserBase):
-    password: str
-
-class UserInDB(UserBase):
-    hashed_password: str
-
-# Inicializar cliente Neo4j
-neo4j_client = Neo4jClient()
-
-# Funciones de autenticación
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    logger.info(f"Creando token de acceso para: {data.get('sub', 'desconocido')}")
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm="HS256")
-    logger.debug(f"Token creado con expiración: {expire}")
-    return encoded_jwt
-
-def get_password_hash(password: str) -> str:
-    logger.debug("Generando hash de contraseña")
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    logger.debug("Verificando contraseña")
-    return get_password_hash(plain_password) == hashed_password
-
-@router.post("/register", response_model=Dict[str, str])
+@router.post("/register", response_model=LoginResponse)
 async def register(
-    username: str = Form(...),
     email: str = Form(...),
+    username: str = Form(...),
     password: str = Form(...),
-    voice: Optional[UploadFile] = File(None)
+    voice_recording: UploadFile = File(None)
 ):
-    logger.info(f"Iniciando registro de usuario: {username} ({email})")
-    start_time = time.time()
-    
     try:
+        logger.info(f"Intento de registro para: {email}")
+
         # Verificar si el usuario ya existe
-        existing_user = neo4j_client.get_user_by_email(email)
+        existing_user = mongo_client.get_user_by_email(email)
         if existing_user:
-            logger.warning(f"Intento de registro con email existente: {email}")
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"detail": "El email ya está registrado"}
-            )
-        
-        # Procesar voz si se proporciona
+            logger.warning(f"Intento de registro con email ya existente: {email}")
+            raise HTTPException(status_code=400, detail="El email ya está registrado")
+
+        # Procesar la grabación de voz si se proporciona
         voice_embedding = None
         voice_url = None
-        if voice:
-            logger.info(f"Procesando archivo de voz para: {username}")
+        if voice_recording:
+            logger.info("Procesando grabación de voz")
+            
+            # Guardar archivo temporalmente
+            temp_file = f"temp_{voice_recording.filename}"
             try:
-                # Guardar archivo temporalmente
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-                    content = await voice.read()
-                    temp_file.write(content)
-                    temp_file_path = temp_file.name
-                
-                # Extraer embedding de voz
-                voice_embedding = extract_voice_embedding(temp_file_path)
-                logger.info(f"Embedding de voz extraído para: {username}")
-                logger.info(f"Tipo de embedding: {type(voice_embedding)}")
-                logger.info(f"Forma del embedding: {voice_embedding.shape if hasattr(voice_embedding, 'shape') else 'No tiene shape'}")
-                
-                # Subir archivo a Azure Storage
-                voice_url = upload_voice_recording(content, f"{email}_{int(time.time())}.wav")
-                logger.info(f"Archivo de voz subido a Azure: {voice_url}")
-                
-                # Eliminar archivo temporal
-                os.unlink(temp_file_path)
-            except Exception as e:
-                logger.error(f"Error al procesar archivo de voz: {str(e)}")
-                return JSONResponse(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    content={"detail": "Error al procesar el archivo de voz"}
-                )
-        
-        # Crear usuario en la base de datos
-        hashed_password = get_password_hash(password)
-        logger.info(f"Preparando datos para crear usuario: username={username}, email={email}, voice_embedding={'presente' if voice_embedding is not None else 'ausente'}")
-        
-        try:
-            success = neo4j_client.create_user_with_voice(
-                username=username,
-                email=email,
-                password=hashed_password,
-                voice_data=voice_url if voice_url else None,
-                voice_embedding=voice_embedding.tolist() if voice_embedding is not None else None
-            )
-            
-            if success:
-                process_time = time.time() - start_time
-                logger.info(f"Usuario registrado exitosamente: {username} ({email}) - Tiempo: {process_time:.2f}s")
-                return {"message": "Usuario registrado exitosamente"}
-            else:
-                logger.error(f"Error al crear usuario en la base de datos: {username} ({email})")
-                return JSONResponse(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    content={"detail": "Error al crear el usuario"}
-                )
-        except Exception as e:
-            logger.error(f"Error al crear usuario: {str(e)}")
-            raise
-            
-    except Exception as e:
-        logger.error(f"Error inesperado durante el registro: {str(e)}")
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": "Error interno del servidor"}
+                with open(temp_file, "wb") as buffer:
+                    content = await voice_recording.read()
+                    if not content:
+                        raise HTTPException(status_code=400, detail="El archivo de voz está vacío")
+                    buffer.write(content)
+                    logger.info(f"Archivo de voz guardado temporalmente: {temp_file}")
+
+                # Extraer embedding
+                voice_embedding = extract_embedding(temp_file)
+                if voice_embedding is None:
+                    raise HTTPException(status_code=400, detail="No se pudo extraer el embedding de la voz")
+
+                # Subir a Azure Storage
+                voice_url = await upload_voice_recording(temp_file, email)
+                logger.info(f"Archivo subido a Azure. URL: {voice_url}")
+
+            finally:
+                # Limpiar archivo temporal
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+                    logger.info("Archivo temporal eliminado")
+
+        # Crear usuario
+        logger.info("Creando usuario en MongoDB")
+        success = mongo_client.create_user(
+            username=username,
+            email=email,
+            password=password,
+            voice_embedding=voice_embedding,
+            voice_url=voice_url
         )
 
-@router.post("/login", response_model=Token)
+        if success:
+            logger.info(f"Usuario registrado exitosamente: {email}")
+            # Crear token de acceso
+            access_token = create_access_token(data={"sub": email})
+            return LoginResponse(
+                access_token=access_token,
+                token_type="bearer",
+                username=username,
+                email=email,
+                voice_url=voice_url
+            )
+        else:
+            logger.error(f"Error al crear usuario en la base de datos: {email}")
+            raise HTTPException(status_code=500, detail="Error al crear el usuario")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al registrar usuario: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error en el servidor")
+
+@router.post("/login", response_model=LoginResponse)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """
     Inicia sesión con credenciales (usuario y contraseña)
     """
     try:
-        # Verificar credenciales
-        user = neo4j_client.verify_user_credentials(form_data.username, form_data.password)
+        logger.info(f"Intento de inicio de sesión para: {form_data.username}")
         
+        # Hashear la contraseña
+        hashed_password = hashlib.sha256(form_data.password.encode()).hexdigest()
+        
+        # Verificar credenciales
+        user = mongo_client.verify_user_credentials(form_data.username, hashed_password)
         if not user:
-            # Intentar verificar con contraseña hasheada
-            user_from_db = neo4j_client.get_user_by_email(form_data.username)
-            if user_from_db and verify_password(form_data.password, user_from_db.get("password", "")):
-                user = user_from_db
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Credenciales incorrectas",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Credenciales incorrectas",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         
         # Crear token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -186,12 +150,13 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             expires_delta=access_token_expires
         )
         
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "username": user["username"],
-            "email": user["email"]
-        }
+        return LoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            username=user.get("username"),
+            email=user["email"],
+            voice_url=user.get("voice_url")
+        )
         
     except Exception as e:
         logger.error(f"Error en el login: {str(e)}")
@@ -202,110 +167,116 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             detail=f"Error en el login: {str(e)}"
         )
 
-@router.post("/login-voice", response_model=Token)
+@router.post("/login-voice", response_model=LoginResponse)
 async def login_with_voice(
     email: str = Form(...),
-    voice: UploadFile = File(...)
+    voice_recording: UploadFile = File(...)
 ):
-    logger.info(f"Iniciando login con voz para email: {email}")
-    start_time = time.time()
-    
     try:
-        # Verificar si el usuario existe
-        user = neo4j_client.get_user_by_email(email)
-        if not user:
-            logger.warning(f"Intento de login con email no registrado: {email}")
-            return JSONResponse(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                content={"detail": "Credenciales inválidas"}
-            )
+        logger.info(f"Intento de login con voz para el email: {email}")
         
-        # Procesar el archivo de voz
-        logger.info(f"Procesando archivo de voz para: {email}")
+        # Buscar usuario por email
+        user = mongo_client.get_user_by_email(email)
+        if not user:
+            logger.warning(f"Usuario no encontrado para el email: {email}")
+            raise HTTPException(status_code=401, detail="Credenciales inválidas")
+
+        # Verificar que el usuario tenga un embedding de voz registrado
+        if not user.get('voice_url'):
+            logger.warning(f"Usuario {email} no tiene archivo de voz registrado")
+            raise HTTPException(status_code=400, detail="No hay voz registrada para este usuario")
+
+        # Descargar el archivo WAV original de Azure Storage
+        original_voice_path = f"original_{user['voice_url'].split('/')[-1]}"
         try:
-            # Guardar el archivo temporalmente
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-                content = await voice.read()
-                temp_file.write(content)
-                temp_file_path = temp_file.name
-            
-            # Extraer embedding de la voz
-            logger.info("Extrayendo embedding de la voz")
-            voice_embedding = extract_voice_embedding(temp_file_path)
-            
-            # Obtener embedding almacenado
-            stored_embedding = user.get("voice_embedding")
-            logger.info(f"Embedding almacenado: {'presente' if stored_embedding is not None else 'ausente'}")
-            if stored_embedding is not None:
-                logger.info(f"Tipo de embedding almacenado: {type(stored_embedding)}")
-                logger.info(f"Longitud del embedding almacenado: {len(stored_embedding) if isinstance(stored_embedding, (list, np.ndarray)) else 'No es una lista/array'}")
-            
-            if not stored_embedding:
-                logger.warning(f"Usuario {email} no tiene embedding de voz almacenado")
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content={"detail": "Usuario no tiene voz registrada"}
-                )
-            
-            # Convertir el embedding almacenado a numpy array
+            # Descargar el archivo original
+            await download_voice_recording(user['voice_url'], original_voice_path)
+            logger.info(f"Archivo original descargado: {original_voice_path}")
+
+            # Guardar el archivo temporal de la nueva grabación
+            temp_file = f"temp_{voice_recording.filename}"
             try:
-                stored_embedding = np.array(stored_embedding)
-                logger.info(f"Embedding convertido a numpy array, forma: {stored_embedding.shape}")
-            except Exception as e:
-                logger.error(f"Error al convertir embedding a numpy array: {str(e)}")
-                return JSONResponse(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    content={"detail": "Error al procesar el embedding de voz"}
+                with open(temp_file, "wb") as buffer:
+                    content = await voice_recording.read()
+                    if not content:
+                        raise HTTPException(status_code=400, detail="El archivo de voz está vacío")
+                    buffer.write(content)
+                    logger.info(f"Archivo de voz guardado temporalmente: {temp_file}")
+
+                # Verificar que el archivo tenga contenido significativo
+                y, sr = librosa.load(temp_file, sr=None)
+                if len(y) == 0:
+                    raise HTTPException(status_code=400, detail="El archivo de voz no contiene audio")
+                
+                # Calcular la energía del audio
+                energy = np.sum(np.abs(y))
+                if energy < 0.1:  # Umbral de energía mínimo
+                    raise HTTPException(status_code=400, detail="El audio es demasiado silencioso")
+
+                # Extraer embedding de la nueva grabación
+                new_embedding = extract_embedding(temp_file)
+                if new_embedding is None:
+                    raise HTTPException(status_code=400, detail="No se pudo extraer el embedding de la voz")
+
+                # Extraer embedding del archivo original
+                original_embedding = extract_embedding(original_voice_path)
+                if original_embedding is None:
+                    raise HTTPException(status_code=400, detail="No se pudo extraer el embedding de la voz original")
+
+                logger.info(f"Embedding original tipo: {type(original_embedding)}, longitud: {len(original_embedding) if isinstance(original_embedding, (list, np.ndarray)) else 'N/A'}")
+                logger.info(f"Embedding nuevo tipo: {type(new_embedding)}, longitud: {len(new_embedding) if isinstance(new_embedding, (list, np.ndarray)) else 'N/A'}")
+
+                # Comparar embeddings
+                similarity = compare_voices(
+                    original_embedding,
+                    new_embedding
                 )
-            
-            # Comparar embeddings
-            logger.info("Comparando embeddings de voz")
-            similarity = compare_voice_embeddings(voice_embedding, stored_embedding)
-            logger.info(f"Similitud de voz: {similarity}")
-            
-            if similarity < VOICE_SIMILARITY_THRESHOLD:
-                logger.warning(f"Autenticación por voz fallida para {email}. Similitud: {similarity}")
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Voz no reconocida"}
+                logger.info(f"Similitud de voz calculada: {similarity}")
+
+                # Umbral de similitud (ajustar según sea necesario)
+                SIMILARITY_THRESHOLD = 0.7
+                if similarity < SIMILARITY_THRESHOLD:
+                    logger.warning(f"Similitud de voz insuficiente: {similarity} < {SIMILARITY_THRESHOLD}")
+                    raise HTTPException(status_code=401, detail="La voz no coincide")
+
+                # Generar token de acceso
+                access_token = create_access_token(
+                    data={"sub": user["email"]},
+                    expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
                 )
-            
-            # Crear token de acceso
-            logger.info(f"Creando token de acceso para: {email}")
-            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-            access_token = create_access_token(
-                data={"sub": email},
-                expires_delta=access_token_expires
-            )
-            
-            # Calcular tiempo de procesamiento
-            process_time = time.time() - start_time
-            logger.info(f"Login con voz completado para {email}. Tiempo: {process_time:.2f}s")
-            
-            return {
-                "access_token": access_token,
-                "token_type": "bearer",
-                "username": user["username"],
-                "email": user["email"]
-            }
-            
-        except Exception as e:
-            logger.error(f"Error al procesar voz para {email}: {str(e)}")
-            return JSONResponse(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content={"detail": "Error al procesar la voz"}
-            )
+
+                return LoginResponse(
+                    access_token=access_token,
+                    token_type="bearer",
+                    username=user.get("username"),
+                    email=user["email"],
+                    voice_url=user.get("voice_url")
+                )
+
+            finally:
+                # Limpiar archivos temporales
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+                    logger.info(f"Archivo temporal eliminado: {temp_file}")
+
         finally:
-            # Limpiar archivo temporal
-            if 'temp_file_path' in locals():
-                try:
-                    os.unlink(temp_file_path)
-                except Exception as e:
-                    logger.error(f"Error al eliminar archivo temporal: {str(e)}")
-    
+            # Limpiar archivo original descargado
+            if os.path.exists(original_voice_path):
+                os.remove(original_voice_path)
+                logger.info(f"Archivo original eliminado: {original_voice_path}")
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error en login con voz para {email}: {str(e)}")
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": "Error interno del servidor"}
-        ) 
+        logger.error(f"Error en login con voz: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error en el servidor")
+
+@router.get("/me", response_model=LoginResponse)
+async def read_users_me(current_user: dict = Depends(get_current_user)):
+    return LoginResponse(
+        access_token="",  # No es necesario devolver el token aquí
+        token_type="bearer",
+        username=current_user.get("username"),
+        email=current_user["email"],
+        voice_url=current_user.get("voice_url")
+    ) 

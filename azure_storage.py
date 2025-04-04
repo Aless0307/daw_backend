@@ -3,92 +3,111 @@ from datetime import datetime, timedelta
 import os
 import uuid
 import logging
-from config import AZURE_STORAGE_CONNECTION_STRING, AZURE_STORAGE_CONTAINER_NAME
+from config import AZURE_STORAGE_CONNECTION_STRING, AZURE_CONTAINER_NAME
+from urllib.parse import unquote
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('azure_storage.log')
+    ]
+)
 logger = logging.getLogger(__name__)
 
-def get_blob_service_client():
-    """Crea y retorna un cliente de Azure Blob Storage"""
-    try:
-        logger.info("Conectando a Azure Blob Storage")
-        return BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
-    except Exception as e:
-        logger.error(f"Error al conectar con Azure Blob Storage: {str(e)}")
-        raise
+# Crear cliente de Azure Storage
+blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME)
 
-def upload_voice_recording(audio_file, user_id=None):
+# Crear contenedor si no existe
+try:
+    if not container_client.exists():
+        logger.info(f"Creando contenedor {AZURE_CONTAINER_NAME}")
+        container_client.create_container()
+        logger.info(f"Contenedor {AZURE_CONTAINER_NAME} creado exitosamente")
+    else:
+        logger.info(f"Contenedor {AZURE_CONTAINER_NAME} ya existe")
+except Exception as e:
+    logger.error(f"Error al verificar/crear contenedor: {str(e)}")
+    raise
+
+async def upload_voice_recording(file_path: str, user_email: str) -> str:
     """
-    Sube un archivo de audio a Azure Blob Storage y genera una URL firmada
+    Sube un archivo de audio a Azure Storage y devuelve la URL de vista previa.
     
     Args:
-        audio_file: El archivo de audio a subir
-        user_id: ID del usuario al que pertenece la grabación (opcional)
-    
+        file_path: Ruta al archivo de audio
+        user_email: Email del usuario para nombrar el archivo
+        
     Returns:
-        str: URL firmada del archivo subido
+        str: URL de vista previa del archivo con token SAS
     """
     try:
-        # Crear un nombre único para el blob usando UUID
-        unique_id = str(uuid.uuid4())
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        user_prefix = f"{user_id}_" if user_id else ""
-        blob_name = f"voice_recordings/{user_prefix}{timestamp}_{unique_id}.wav"
+        # Generar nombre único para el archivo
+        file_name = f"voices/{user_email}_{os.path.basename(file_path)}"
+        logger.info(f"Subiendo archivo: {file_name}")
         
-        logger.info(f"Iniciando subida de archivo a Azure Storage: {blob_name}")
+        # Crear cliente para el blob
+        blob_client = container_client.get_blob_client(file_name)
         
-        # Obtener el cliente del servicio
-        blob_service_client = get_blob_service_client()
+        # Configurar Content-Type para audio/wav
+        content_settings = ContentSettings(content_type="audio/wav")
         
-        # Obtener las credenciales de la cadena de conexión
-        account_name = blob_service_client.account_name
-        account_key = blob_service_client.credential.account_key
+        # Subir archivo
+        with open(file_path, "rb") as data:
+            blob_client.upload_blob(data, content_settings=content_settings, overwrite=True)
         
-        # Configurar el content type para reproducción en el navegador
-        content_settings = ContentSettings(
-            content_type='audio/wav',
-            content_disposition='inline'  # Esto hace que se reproduzca en lugar de descargarse
+        # Generar token SAS para lectura (válido por 1 año)
+        sas_token = generate_blob_sas(
+            account_name=blob_service_client.account_name,
+            container_name=AZURE_CONTAINER_NAME,
+            blob_name=file_name,
+            account_key=blob_service_client.credential.account_key,
+            permission=BlobSasPermissions(read=True),
+            expiry=datetime.utcnow() + timedelta(days=365)
         )
         
-        # Subir el archivo
-        container_client = blob_service_client.get_container_client(AZURE_STORAGE_CONTAINER_NAME)
+        # Construir URL de vista previa
+        preview_url = f"{blob_client.url}?{sas_token}"
+        logger.info(f"Archivo subido exitosamente. URL: {preview_url}")
+        
+        return preview_url
+        
+    except Exception as e:
+        logger.error(f"Error al subir archivo a Azure Storage: {str(e)}")
+        raise
+
+async def download_voice_recording(blob_url: str, local_path: str) -> None:
+    """
+    Descarga un archivo de audio de Azure Storage.
+    
+    Args:
+        blob_url: URL del blob en Azure Storage
+        local_path: Ruta local donde guardar el archivo
+    """
+    try:
+        # Extraer el nombre del blob de la URL y decodificarlo
+        # La URL tiene formato: https://<account>.blob.core.windows.net/<container>/<blob_name>?<sas_token>
+        # Necesitamos extraer solo el <blob_name> y decodificarlo
+        blob_name = unquote(blob_url.split(f"{AZURE_CONTAINER_NAME}/")[1].split("?")[0])
+        logger.info(f"Descargando archivo (nombre decodificado): {blob_name}")
+        
+        # Crear cliente para el blob usando el nombre del blob decodificado
         blob_client = container_client.get_blob_client(blob_name)
         
-        # Verificar si existe el contenedor, si no, crearlo
-        try:
-            container_props = container_client.get_container_properties()
-        except Exception:
-            logger.info(f"Contenedor {AZURE_STORAGE_CONTAINER_NAME} no existe, creándolo...")
-            container_client = blob_service_client.create_container(AZURE_STORAGE_CONTAINER_NAME)
+        # Verificar si el blob existe
+        if not blob_client.exists():
+            logger.error(f"El blob {blob_name} no existe en el contenedor {AZURE_CONTAINER_NAME}")
+            raise Exception(f"El archivo de voz {blob_name} no existe en el almacenamiento")
         
-        # Subir el archivo
-        blob_client.upload_blob(
-            audio_file,
-            overwrite=True,
-            content_settings=content_settings
-        )
+        # Descargar archivo
+        with open(local_path, "wb") as download_file:
+            download_file.write(blob_client.download_blob().readall())
+            
+        logger.info(f"Archivo descargado exitosamente a: {local_path}")
         
-        logger.info(f"Archivo subido exitosamente a Azure Storage: {blob_name}")
-        
-        # Generar URL firmada con expiración de 1 año
-        sas_token = generate_blob_sas(
-            account_name=account_name,
-            container_name=AZURE_STORAGE_CONTAINER_NAME,
-            blob_name=blob_name,
-            account_key=account_key,
-            permission=BlobSasPermissions(read=True),
-            expiry=datetime.utcnow() + timedelta(days=365),
-            start=datetime.utcnow() - timedelta(minutes=5)
-        )
-        
-        # Construir la URL completa con el token SAS
-        base_url = f"https://{account_name}.blob.core.windows.net/{AZURE_STORAGE_CONTAINER_NAME}/{blob_name}"
-        blob_url = f"{base_url}?{sas_token}"
-        
-        logger.info(f"URL de Azure generada: {base_url}")
-        
-        return blob_url
     except Exception as e:
-        logger.error(f"Error al subir el archivo a Azure Storage: {str(e)}")
+        logger.error(f"Error al descargar archivo de Azure Storage: {str(e)}")
         raise 

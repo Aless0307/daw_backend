@@ -6,8 +6,10 @@ import io
 import os
 import logging
 from config import VOICE_SIMILARITY_THRESHOLD
-from auth.auth_utils import get_current_user
-from neo4j_client import Neo4jClient
+from utils.auth_utils import get_current_user
+from mongodb_client import MongoDBClient
+from scipy.spatial.distance import cosine
+from azure_storage import upload_voice_recording
 
 # Configurar logging
 logging.basicConfig(
@@ -21,164 +23,209 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-neo4j_client = Neo4jClient()
-
-def extract_voice_embedding(audio_file):
+mongo_client = MongoDBClient()
+def extract_embedding(audio_path: str) -> np.ndarray:
     """
-    Extrae el embedding de voz usando Resemblyzer
-    
-    Args:
-        audio_file: El archivo de audio a procesar
-        
-    Returns:
-        numpy.ndarray: El embedding de voz
+    Extrae el embedding de voz de un archivo de audio usando VoiceEncoder.
     """
-    logger.info(f"Iniciando extracción de embedding para archivo: {audio_file}")
     try:
-        # Verificar que el archivo existe
-        if not os.path.exists(audio_file):
-            logger.error(f"El archivo de audio no existe: {audio_file}")
-            raise FileNotFoundError(f"El archivo de audio no existe: {audio_file}")
+        logger.info(f"Extrayendo embedding de {audio_path}")
         
-        # Cargar el audio
-        logger.info("Cargando archivo de audio...")
-        audio, sr = librosa.load(audio_file, sr=16000)
-        logger.info(f"Audio cargado. Duración: {len(audio)/sr:.2f}s, Sample rate: {sr}Hz")
+        # Verificar que el archivo existe y no está vacío
+        if not os.path.exists(audio_path):
+            logger.error(f"El archivo {audio_path} no existe")
+            return None
+            
+        if os.path.getsize(audio_path) == 0:
+            logger.error(f"El archivo {audio_path} está vacío")
+            return None
+
+        # Cargar y preprocesar el audio usando resemblyzer
+        wav = preprocess_wav(audio_path)
         
-        # Preprocesar el audio
-        logger.info("Preprocesando audio...")
-        processed_audio = preprocess_wav(audio)
-        logger.info("Audio preprocesado correctamente")
-        
-        # Crear el encoder
-        logger.info("Inicializando encoder de voz...")
+        # Verificar que el audio no está vacío
+        if len(wav) == 0:
+            logger.error("No se pudo cargar el audio o el audio está vacío")
+            return None
+            
+        # Crear el codificador si no existe
         encoder = VoiceEncoder()
         
-        # Extraer el embedding
-        logger.info("Extrayendo embedding...")
-        embedding = encoder.embed_utterance(processed_audio)
-        logger.info(f"Embedding extraído. Dimensión: {len(embedding)}")
+        # Extraer embedding usando resemblyzer
+        embedding = encoder.embed_utterance(wav)
         
-        return embedding
-        
-    except Exception as e:
-        logger.error(f"Error al procesar el audio: {str(e)}")
-        raise
+        logger.info(f"Embedding extraído correctamente. Tamaño: {len(embedding)}")
+        return embedding.tolist()
 
-def compare_voice_embeddings(embedding1, embedding2, threshold=None):
+    except Exception as e:
+        logger.error(f"Error al extraer embedding: {str(e)}")
+        return None
+
+def compare_voices(embedding1, embedding2):
     """
-    Compara dos embeddings de voz
+    Compara dos embeddings de voz usando similitud del coseno.
     
     Args:
-        embedding1: Primer embedding
-        embedding2: Segundo embedding
-        threshold: Umbral de similitud (0-1), si es None usa el de la configuración
+        embedding1: Primer embedding de voz
+        embedding2: Segundo embedding de voz
         
     Returns:
-        float: Similitud entre los embeddings (0-1)
+        float: Similitud entre 0 y 1
     """
-    logger.info("Iniciando comparación de embeddings")
     try:
-        # Usar el umbral proporcionado o el de la configuración
-        threshold = threshold or VOICE_SIMILARITY_THRESHOLD
-        logger.info(f"Umbral de similitud: {threshold}")
+        logger.info("Comparando embeddings de voz")
         
-        # Verificar dimensiones
-        if len(embedding1) != len(embedding2):
-            logger.error(f"Dimensiones de embeddings no coinciden: {len(embedding1)} != {len(embedding2)}")
-            raise ValueError("Los embeddings deben tener la misma dimensión")
+        # Convertir a numpy arrays si son listas
+        if isinstance(embedding1, list):
+            embedding1 = np.array(embedding1)
+        if isinstance(embedding2, list):
+            embedding2 = np.array(embedding2)
+            
+        logger.info(f"Embedding 1 tipo: {type(embedding1)}, longitud: {len(embedding1)}")
+        logger.info(f"Embedding 2 tipo: {type(embedding2)}, longitud: {len(embedding2)}")
         
-        # Calcular similitud
-        similarity = float(np.dot(embedding1, embedding2) / 
-                         (np.linalg.norm(embedding1) * np.linalg.norm(embedding2)))
+        # Verificar que los embeddings no son nulos o vacíos
+        if embedding1 is None or embedding2 is None or len(embedding1) == 0 or len(embedding2) == 0:
+            logger.warning("Uno de los embeddings es nulo o vacío")
+            return 0.0
+            
+        # Verificar que los embeddings no sean todos ceros
+        if np.all(np.abs(embedding1) < 1e-10) or np.all(np.abs(embedding2) < 1e-10):
+            logger.warning("Uno de los embeddings es prácticamente cero")
+            return 0.0
         
-        logger.info(f"Similitud calculada: {similarity:.4f}")
-        return similarity
+        # Usar la función de scipy para calcular la distancia del coseno
+        # cosine_distance = 1 - similarity, por lo que hacemos 1 - cosine_distance
+        similarity = 1 - cosine(embedding1, embedding2)
+        
+        logger.info(f"Similitud calculada: {similarity}")
+        
+        # Asegurar que el resultado está entre 0 y 1
+        similarity = max(0.0, min(1.0, similarity))
+        
+        return float(similarity)
         
     except Exception as e:
         logger.error(f"Error al comparar embeddings: {str(e)}")
-        raise 
-
+        return 0.0
+    
 @router.post("/extract-embedding")
-async def extract_embedding(
-    audio_file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
-):
+async def extract_voice_embedding(voice_recording: UploadFile = File(...)):
     """
-    Extrae el embedding de voz de un archivo de audio
+    Extrae el embedding de un archivo de voz
     """
     try:
-        # Guardar el archivo temporalmente
-        temp_path = f"temp_{audio_file.filename}"
-        with open(temp_path, "wb") as buffer:
-            content = await audio_file.read()
-            buffer.write(content)
+        logger.info("Extrayendo embedding de voz")
         
-        # Extraer el embedding
-        embedding = extract_voice_embedding(temp_path)
+        # Guardar archivo temporalmente
+        temp_file_path = f"temp_{voice_recording.filename}"
+        with open(temp_file_path, "wb") as temp_file:
+            content = await voice_recording.read()
+            temp_file.write(content)
         
-        # Limpiar el archivo temporal
-        os.remove(temp_path)
+        # Extraer embedding
+        embedding = extract_embedding(temp_file_path)
         
-        return {"embedding": embedding.tolist()}
+        # Eliminar archivo temporal
+        os.remove(temp_file_path)
+        
+        return {"embedding": embedding}
         
     except Exception as e:
         logger.error(f"Error al extraer embedding: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Error al procesar el archivo de voz"
+        )
 
 @router.post("/compare-voices")
-async def compare_voices(
-    embedding1: list,
-    embedding2: list,
-    threshold: float = None,
-    current_user: dict = Depends(get_current_user)
+async def compare_voice_samples(
+    voice1: UploadFile = File(...),
+    voice2: UploadFile = File(...)
 ):
     """
-    Compara dos embeddings de voz
+    Compara dos muestras de voz
     """
     try:
-        similarity = compare_voice_embeddings(
-            np.array(embedding1),
-            np.array(embedding2),
-            threshold
-        )
+        logger.info("Comparando muestras de voz")
+        
+        # Procesar primera voz
+        temp_path1 = f"temp_{voice1.filename}"
+        with open(temp_path1, "wb") as temp_file:
+            content = await voice1.read()
+            temp_file.write(content)
+        embedding1 = extract_embedding(temp_path1)
+        
+        # Procesar segunda voz
+        temp_path2 = f"temp_{voice2.filename}"
+        with open(temp_path2, "wb") as temp_file:
+            content = await voice2.read()
+            temp_file.write(content)
+        embedding2 = extract_embedding(temp_path2)
+        
+        # Comparar embeddings
+        similarity = compare_voices(embedding1, embedding2)
+        
+        # Limpiar archivos temporales
+        os.remove(temp_path1)
+        os.remove(temp_path2)
+        
         return {"similarity": similarity}
         
     except Exception as e:
         logger.error(f"Error al comparar voces: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Error al procesar los archivos de voz"
+        )
 
 @router.post("/register-voice")
 async def register_voice(
-    audio_file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    voice_recording: UploadFile = File(...)
 ):
     """
-    Registra la voz de un usuario
+    Registra una nueva muestra de voz para el usuario
     """
     try:
-        # Extraer el embedding
-        temp_path = f"temp_{audio_file.filename}"
-        with open(temp_path, "wb") as buffer:
-            content = await audio_file.read()
-            buffer.write(content)
+        logger.info(f"Registrando nueva voz para: {current_user['email']}")
         
-        embedding = extract_voice_embedding(temp_path)
-        os.remove(temp_path)
+        # Guardar archivo temporalmente
+        temp_file_path = f"temp_{voice_recording.filename}"
+        with open(temp_file_path, "wb") as temp_file:
+            content = await voice_recording.read()
+            temp_file.write(content)
         
-        # Guardar el embedding en Neo4j
-        with neo4j_client.get_session() as session:
-            session.run(
-                """
-                MATCH (u:User {email: $email})
-                SET u.voice_embedding = $embedding
-                """,
-                email=current_user["email"],
-                embedding=embedding.tolist()
+        # Extraer embedding
+        voice_embedding = extract_embedding(temp_file_path)
+        
+        # Subir a Azure Storage
+        voice_url = upload_voice_recording(temp_file_path)
+        
+        # Eliminar archivo temporal
+        os.remove(temp_file_path)
+        
+        # Actualizar en la base de datos
+        success = mongo_client.update_user_voice(
+            email=current_user["email"],
+            voice_embedding=voice_embedding,
+            voice_url=voice_url
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Error al actualizar los datos de voz"
             )
         
-        return {"message": "Voz registrada correctamente"}
+        return {
+            "message": "Voz registrada exitosamente",
+            "voice_url": voice_url
+        }
         
     except Exception as e:
         logger.error(f"Error al registrar voz: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(
+            status_code=500,
+            detail="Error al procesar el archivo de voz"
+        ) 
