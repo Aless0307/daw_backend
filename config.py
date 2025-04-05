@@ -47,11 +47,23 @@ AZURE_CONTAINER_NAME = "daw"
 # Configuración de CORS
 ALLOWED_ORIGINS = [
     "https://daw-frontend.vercel.app",
-    "http://localhost:5173"
+    "https://dawbackend-production.up.railway.app",
+    "http://localhost:5173",
+    "http://localhost:8000",
+    "http://localhost:8003"
 ] if IS_PRODUCTION else [
     "http://localhost:5173",
-    "http://localhost:8000"
+    "http://localhost:8000",
+    "http://localhost:8003"
 ]
+
+# Configuración adicional de CORS
+CORS_CONFIG = {
+    "allow_origins": ALLOWED_ORIGINS,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
 
 # Configuración de URLs
 PRODUCTION_URL = os.getenv("PRODUCTION_URL", "https://dawbackend-production.up.railway.app")

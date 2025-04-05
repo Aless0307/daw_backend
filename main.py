@@ -10,11 +10,13 @@ from config import (
     GROQ_API_KEY,
     REQUEST_TIMEOUT,
     ENVIRONMENT,
-    IS_PRODUCTION
+    IS_PRODUCTION,
+    CORS_CONFIG
 )
 from auth import router as auth_router
 from voice_processing import router as voice_router
 from groq import router as groq_router
+import os
 
 # Configurar logging
 logging.basicConfig(
@@ -27,25 +29,43 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Log del entorno actual
+logger.info(f"Iniciando aplicación en entorno: {ENVIRONMENT}")
+logger.info(f"CORS permitidos: {ALLOWED_ORIGINS}")
+
 app = FastAPI()
 
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    **CORS_CONFIG
 )
 
-# Middleware para medir tiempo de procesamiento
+# Middleware para medir tiempo de procesamiento y logging
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     start_time = time.time()
-    response = await call_next(request)
-    process_time = time.time() - start_time
-    response.headers["X-Process-Time"] = str(process_time)
-    return response
+    
+    # Log de la solicitud entrante
+    logger.info(f"Solicitud recibida: {request.method} {request.url}")
+    logger.debug(f"Headers de la solicitud: {request.headers}")
+    
+    try:
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        response.headers["X-Process-Time"] = str(process_time)
+        
+        # Log de la respuesta
+        logger.info(f"Respuesta enviada: {response.status_code}")
+        logger.debug(f"Tiempo de proceso: {process_time:.2f}s")
+        
+        return response
+    except Exception as e:
+        logger.error(f"Error procesando la solicitud: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Error interno del servidor"}
+        )
 
 @app.get("/")
 async def root():
@@ -62,6 +82,6 @@ app.include_router(groq_router, prefix="/groq", tags=["groq"])
 
 if __name__ == "__main__":
     import uvicorn
-    logger.info("Iniciando servidor...")
-    uvicorn.run(app, host="0.0.0.0", port=8003)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=not IS_PRODUCTION)
 
