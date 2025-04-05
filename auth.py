@@ -213,6 +213,8 @@ async def login_with_voice(
             logger.warning(f"⚠️ Usuario {email} no tiene voz registrada")
             raise HTTPException(status_code=400, detail="No hay voz registrada para este usuario")
 
+        logger.info(f"🔍 Voice URL del usuario: {user['voice_url']}")
+
         # Descargar el archivo WAV original de Azure Storage
         temp_dir = "./temp_files"
         if not os.path.exists(temp_dir):
@@ -221,12 +223,26 @@ async def login_with_voice(
         original_voice_path = f"{temp_dir}/original_{os.path.basename(user['voice_url']) if '/' in user['voice_url'] else user['voice_url']}"
         try:
             # Descargar el archivo original
+            logger.info(f"⬇️ Intentando descargar archivo de voz original a: {original_voice_path}")
             original_path = await download_voice_recording(user['voice_url'], original_voice_path)
+            
             if not original_path:
                 logger.error("❌ No se pudo descargar el archivo de voz original")
-                raise HTTPException(status_code=500, detail="Error al procesar la voz")
+                # Intentar verificar si Azure Storage está disponible
+                from azure_storage import is_azure_available
+                if not is_azure_available:
+                    logger.error("❌ Azure Storage no está disponible. Verificando credenciales de autenticación tradicional.")
+                    # Comprobar si el usuario existe pero sin verificación de voz
+                    # Esta es una solución temporal mientras se resuelve el problema de Azure
+                    raise HTTPException(
+                        status_code=503, 
+                        detail="El servicio de autenticación por voz no está disponible. Por favor, intente más tarde o use otro método de inicio de sesión."
+                    )
+                else:
+                    raise HTTPException(status_code=500, detail="Error al procesar la voz")
+                    
             logger.info(f"📥 Archivo original descargado: {original_path}")
-
+            
             # Guardar el archivo temporal de la nueva grabación
             temp_file = f"{temp_dir}/temp_{voice_recording.filename}"
             try:
@@ -235,7 +251,7 @@ async def login_with_voice(
                     if not content:
                         raise HTTPException(status_code=400, detail="El archivo de voz está vacío")
                     buffer.write(content)
-                    logger.info(f"💾 Archivo de voz guardado: {temp_file}")
+                    logger.info(f"💾 Archivo de voz guardado: {temp_file} ({len(content)} bytes)")
 
                 # Verificar que el archivo tenga contenido significativo
                 y, sr = librosa.load(temp_file, sr=None)
@@ -244,11 +260,15 @@ async def login_with_voice(
                 
                 # Calcular la energía del audio
                 energy = np.sum(np.abs(y))
+                logger.info(f"🔊 Energía del audio: {energy}")
                 if energy < 0.1:
                     raise HTTPException(status_code=400, detail="El audio es demasiado silencioso")
 
                 # Extraer embeddings y comparar
+                logger.info(f"🧠 Extrayendo embedding del archivo de entrada: {temp_file}")
                 new_embedding = extract_embedding(temp_file)
+                
+                logger.info(f"🧠 Extrayendo embedding del archivo original: {original_path}")
                 original_embedding = extract_embedding(original_path)
                 
                 if new_embedding is None or original_embedding is None:
@@ -256,8 +276,9 @@ async def login_with_voice(
                     raise HTTPException(status_code=400, detail="Error al procesar la voz")
 
                 # Comparar embeddings
+                logger.info("🔍 Comparando embeddings de voz...")
                 similarity = compare_voices(original_embedding, new_embedding)
-                logger.info(f"🎯 Similitud de voz: {similarity:.2f}")
+                logger.info(f"🎯 Similitud de voz: {similarity:.2f}, Umbral: {VOICE_SIMILARITY_THRESHOLD}")
 
                 if similarity < VOICE_SIMILARITY_THRESHOLD:
                     logger.warning(f"❌ Similitud insuficiente: {similarity:.2f} < {VOICE_SIMILARITY_THRESHOLD}")
@@ -285,7 +306,7 @@ async def login_with_voice(
 
         finally:
             # Limpiar archivo original
-            if os.path.exists(original_path):
+            if original_path and os.path.exists(original_path):
                 os.remove(original_path)
                 logger.debug("🧹 Archivo original eliminado")
 
@@ -293,6 +314,8 @@ async def login_with_voice(
         raise
     except Exception as e:
         logger.error(f"❌ Error en login con voz: {str(e)}")
+        import traceback
+        logger.error(f"Stack trace: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail="Error al procesar la autenticación por voz"

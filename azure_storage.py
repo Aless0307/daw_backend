@@ -1,8 +1,11 @@
 from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions, ContentSettings
+from azure.core.exceptions import ResourceNotFoundError, AzureError
 from datetime import datetime, timedelta
 import os
 import uuid
 import logging
+import traceback
+import requests
 from config import (
     AZURE_STORAGE_CONNECTION_STRING, 
     AZURE_CONTAINER_NAME,
@@ -35,24 +38,96 @@ def init_azure_storage():
     """
     global blob_service_client, container_client, is_azure_available
     
+    logger.info("🔄 Inicializando conexión a Azure Storage...")
+    
+    # Verificar que la cadena de conexión no está vacía
+    if not AZURE_STORAGE_CONNECTION_STRING:
+        logger.error("❌ AZURE_STORAGE_CONNECTION_STRING está vacía")
+        return False
+        
+    if not AZURE_CONTAINER_NAME:
+        logger.error("❌ AZURE_CONTAINER_NAME está vacío")
+        return False
+        
+    logger.info(f"📦 Intentando conectar a Azure Storage - Contenedor: {AZURE_CONTAINER_NAME}")
+    logger.info(f"🔑 Primeros 10 caracteres de la conexión: {AZURE_STORAGE_CONNECTION_STRING[:10]}...")
+    
     try:
         # Crear cliente de Azure Storage
         blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+        logger.info(f"✅ Cliente de servicio creado - Cuenta: {blob_service_client.account_name}")
+        
+        # Verificar endpoint
+        logger.info(f"🌐 URL del servicio: {blob_service_client.url}")
+        
+        # Probar conectividad básica
+        account_info = blob_service_client.get_account_information()
+        logger.info(f"✅ Conexión exitosa - SKU: {account_info['sku_name']}, API: {account_info['account_kind']}")
+        
+        # Verificar que el contenedor existe
         container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME)
+        logger.info("🔍 Verificando existencia del contenedor...")
         
-        # Verificar conexión
-        container_client.get_container_properties()
+        if container_client.exists():
+            logger.info(f"✅ Contenedor {AZURE_CONTAINER_NAME} encontrado")
+            
+            # Verificar permisos del contenedor
+            try:
+                props = container_client.get_container_properties()
+                public_access = props.get('public_access', 'ninguno')
+                logger.info(f"🔒 Nivel de acceso público del contenedor: {public_access}")
+            except Exception as e:
+                logger.warning(f"⚠️ No se pudieron obtener propiedades del contenedor: {str(e)}")
+        else:
+            # Intentar crear el contenedor
+            logger.warning(f"⚠️ Contenedor {AZURE_CONTAINER_NAME} no existe, intentando crear...")
+            try:
+                container_client.create_container()
+                logger.info(f"✅ Contenedor {AZURE_CONTAINER_NAME} creado exitosamente")
+            except Exception as e:
+                logger.error(f"❌ Error al crear contenedor: {str(e)}")
+                return False
         
+        # Probar CORS haciendo una solicitud OPTIONS
+        try:
+            test_url = f"https://{blob_service_client.account_name}.blob.core.windows.net/{AZURE_CONTAINER_NAME}"
+            logger.info(f"🌐 Probando CORS con OPTIONS a: {test_url}")
+            
+            headers = {
+                'Origin': 'https://dawbackend-production.up.railway.app',
+                'Access-Control-Request-Method': 'GET',
+                'Access-Control-Request-Headers': 'Authorization,Content-Type'
+            }
+            
+            response = requests.options(test_url, headers=headers, timeout=5)
+            logger.info(f"📝 Respuesta CORS - Código: {response.status_code}")
+            
+            if 'Access-Control-Allow-Origin' in response.headers:
+                logger.info(f"✅ CORS permitido para origen: {response.headers['Access-Control-Allow-Origin']}")
+            else:
+                logger.warning("⚠️ La respuesta no incluye encabezados CORS")
+                for header, value in response.headers.items():
+                    logger.info(f"📝 {header}: {value}")
+        except Exception as e:
+            logger.warning(f"⚠️ Error al probar CORS: {str(e)}")
+            
+        # Si llegamos aquí, la conexión fue exitosa
         is_azure_available = True
-        logger.info("Conexión a Azure Storage establecida correctamente")
+        logger.info("✅ Conexión a Azure Storage establecida correctamente")
         return True
         
+    except ResourceNotFoundError as e:
+        is_azure_available = False
+        logger.error(f"❌ Recurso no encontrado en Azure Storage: {str(e)}")
+        return False
+    except AzureError as e:
+        is_azure_available = False
+        logger.error(f"❌ Error de Azure: {str(e)}")
+        return False
     except Exception as e:
         is_azure_available = False
-        if IS_PRODUCTION:
-            logger.error(f"Error al conectar con Azure Storage: {str(e)}")
-        else:
-            logger.warning("Azure Storage no disponible en desarrollo")
+        logger.error(f"❌ Error al conectar con Azure Storage: {str(e)}")
+        logger.error(f"Stack trace: {traceback.format_exc()}")
         return False
 
 # Intentar inicializar Azure Storage al importar el módulo
@@ -126,56 +201,121 @@ async def download_voice_recording(blob_url: str, local_path: str = None) -> str
         str: Ruta local del archivo descargado o None si falla
     """
     if not is_azure_available:
-        logger.warning("Azure Storage no disponible, no se puede descargar el archivo")
-        return None
+        logger.warning("⚠️ Azure Storage no disponible, no se puede descargar el archivo")
         
+        # Verificar si podemos reconectar
+        logger.info("🔄 Intentando reconectar a Azure Storage...")
+        if not init_azure_storage():
+            logger.error("❌ Reconexión a Azure Storage fallida")
+            return None
+    
     try:
+        # Validar parámetros
+        if not blob_url:
+            logger.error("❌ URL del blob es vacía o None")
+            return None
+            
+        logger.info(f"🔍 Intentando descargar archivo: {blob_url}")
+        
         # Extraer el nombre del blob de la URL si es una URL completa
         if blob_url.startswith('http'):
             # La URL tiene formato: https://<account>.blob.core.windows.net/<container>/<blob_name>?<sas_token>
-            blob_name = unquote(blob_url.split(f"{AZURE_CONTAINER_NAME}/")[1].split("?")[0])
+            logger.info(f"🔍 Analizando URL del blob: {blob_url}")
+            
+            try:
+                # Extraer el nombre del blob de la URL
+                if f"{AZURE_CONTAINER_NAME}/" in blob_url:
+                    parts = blob_url.split(f"{AZURE_CONTAINER_NAME}/")
+                    if len(parts) > 1:
+                        blob_name_with_query = parts[1]
+                        # Separar nombre de blob del token SAS
+                        blob_name = blob_name_with_query.split("?")[0]
+                        blob_name = unquote(blob_name)
+                        logger.info(f"✅ Nombre del blob extraído: {blob_name}")
+                    else:
+                        logger.error(f"❌ No se pudo extraer el nombre del blob de la URL: {blob_url}")
+                        return None
+                else:
+                    logger.error(f"❌ URL no contiene el nombre del contenedor {AZURE_CONTAINER_NAME}")
+                    return None
+            except Exception as e:
+                logger.error(f"❌ Error al analizar URL del blob: {str(e)}")
+                return None
         else:
             # Si no es una URL, usar el nombre directamente
             blob_name = blob_url
+            logger.info(f"✅ Usando nombre de blob directamente: {blob_name}")
             
-        logger.info(f"Descargando archivo (nombre decodificado): {blob_name}")
-        
         # Crear cliente para el blob
         blob_client = container_client.get_blob_client(blob_name)
         
         # Verificar si el blob existe
+        logger.info(f"🔍 Verificando existencia del blob: {blob_name}")
         if not blob_client.exists():
-            logger.error(f"El blob {blob_name} no existe en el contenedor {AZURE_CONTAINER_NAME}")
-            raise Exception(f"El archivo de voz {blob_name} no existe en el almacenamiento")
+            logger.error(f"❌ El blob {blob_name} no existe en el contenedor {AZURE_CONTAINER_NAME}")
+            
+            # Listar algunos blobs para debug
+            try:
+                logger.info(f"🔍 Listando hasta 5 blobs del contenedor como referencia:")
+                count = 0
+                for blob in container_client.list_blobs():
+                    logger.info(f"📄 Blob encontrado: {blob.name}")
+                    count += 1
+                    if count >= 5:
+                        break
+                if count == 0:
+                    logger.warning("⚠️ No se encontraron blobs en el contenedor")
+            except Exception as e:
+                logger.warning(f"⚠️ Error al listar blobs: {str(e)}")
+                
+            return None
+        
+        logger.info(f"✅ Blob {blob_name} encontrado")
         
         # Si no se proporciona local_path o está vacío, crear uno temporal
-        if not local_path:
-            local_path = f"/tmp/{os.path.basename(blob_name)}"
-        
-        # Directorio temporal para archivos
-        temp_dir = "./temp_files"
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
-            
-        # Asegurarse de que la ruta local es válida
-        if not local_path or local_path == "":
-            local_path = f"{temp_dir}/{os.path.basename(blob_name)}"
+        if not local_path or local_path.strip() == "":
+            # Crear directorio temporal
+            temp_dir = "./temp_files"
+            if not os.path.exists(temp_dir):
+                os.makedirs(temp_dir)
+                
+            local_path = f"{temp_dir}/download_{uuid.uuid4()}_{os.path.basename(blob_name)}"
+            logger.info(f"🔄 Creando ruta local automática: {local_path}")
             
         # Asegurarse de que el directorio existe
-        os.makedirs(os.path.dirname(os.path.abspath(local_path)), exist_ok=True)
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(local_path)), exist_ok=True)
+            logger.info(f"📁 Directorio para guardar creado: {os.path.dirname(os.path.abspath(local_path))}")
+        except Exception as e:
+            logger.error(f"❌ Error al crear directorio: {str(e)}")
+            local_path = f"./temp_download_{uuid.uuid4()}_{os.path.basename(blob_name)}"
+            logger.info(f"🔄 Usando ruta alternativa: {local_path}")
         
-        logger.info(f"Guardando archivo en: {local_path}")
+        logger.info(f"⬇️ Descargando blob a: {local_path}")
         
         # Descargar archivo
         with open(local_path, "wb") as download_file:
-            download_file.write(blob_client.download_blob().readall())
+            download_data = blob_client.download_blob()
+            download_file.write(download_data.readall())
             
-        logger.info(f"Archivo descargado exitosamente a: {local_path}")
+        # Verificar que el archivo se descargó correctamente
+        if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+            logger.info(f"✅ Archivo descargado exitosamente a: {local_path} ({os.path.getsize(local_path)} bytes)")
+            return local_path
+        else:
+            logger.error(f"❌ El archivo descargado está vacío o no existe: {local_path}")
+            return None
         
-        return local_path
-        
+    except ResourceNotFoundError as e:
+        logger.error(f"❌ Recurso no encontrado en Azure: {str(e)}")
+        return None
+    except AzureError as e:
+        logger.error(f"❌ Error de Azure: {str(e)}")
+        is_azure_available = False  # Marcar como no disponible para futuros intentos
+        return None
     except Exception as e:
-        logger.error(f"Error al descargar archivo de Azure Storage: {str(e)}")
+        logger.error(f"❌ Error al descargar archivo de Azure Storage: {str(e)}")
+        logger.error(f"Stack trace: {traceback.format_exc()}")
         return None
 
 def get_azure_status():
