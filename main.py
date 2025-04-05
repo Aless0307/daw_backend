@@ -82,38 +82,73 @@ async def root():
 
 # Middleware para medir tiempo de procesamiento y logging
 @app.middleware("http")
-async def add_process_time_header(request: Request, call_next):
+async def log_requests(request: Request, call_next):
     start_time = time.time()
     
-    # Log de la solicitud entrante
-    logger.info(f"📥 {request.method} {request.url.path}")
+    # Obtener detalles de la solicitud
+    path = request.url.path
+    method = request.method
+    logger.info(f"📥 {method} {path}")
+    
+    # Establecer timeout más largo para rutas relacionadas con voz
+    timeout = 60  # Default 60 segundos
+    if '/voice/' in path or '/login-voice' in path:
+        timeout = 120  # 2 minutos para rutas de voz
+        logger.info(f"⏱️ Timeout extendido a {timeout}s para ruta de voz")
     
     try:
-        response = await call_next(request)
-        process_time = time.time() - start_time
-        response.headers["X-Process-Time"] = str(process_time)
+        # Procesar la solicitud con timeout
+        import asyncio
         
-        # Log de la respuesta con emojis según el código de estado
-        status_emoji = "✅" if response.status_code < 400 else "❌"
-        logger.info(f"{status_emoji} {response.status_code} - {request.method} {request.url.path} ({process_time:.2f}s)")
+        # Crear una tarea para procesar la solicitud
+        async def process_request():
+            return await call_next(request)
         
-        return response
-    except Exception as e:
-        process_time = time.time() - start_time
-        error_msg = str(e)
-        
-        # Errores específicos
-        if "UnboundLocalError: local variable" in error_msg and "azure_storage" in error_msg:
-            logger.error(f"❌ Error de Azure Storage: {error_msg}")
+        # Ejecutar con timeout
+        try:
+            response = await asyncio.wait_for(process_request(), timeout=timeout)
+            
+            # Calcular tiempo de procesamiento
+            process_time = time.time() - start_time
+            logger.info(f"✅ {method} {path} completado en {process_time:.2f}s - Status: {response.status_code}")
+            
+            return response
+        except asyncio.TimeoutError:
+            # Si el procesamiento toma demasiado tiempo
+            process_time = time.time() - start_time
+            logger.error(f"⏱️ Timeout en {method} {path} después de {process_time:.2f}s")
+            
+            # Respuesta especial para timeout
             return JSONResponse(
-                status_code=503,
-                content={"detail": "El servicio de autenticación por voz no está disponible temporalmente. Por favor, intente más tarde o use otro método de inicio de sesión."}
+                status_code=504,
+                content={
+                    "detail": "La solicitud tardó demasiado en procesarse. Por favor, intente más tarde."
+                }
             )
             
-        logger.error(f"❌ Error en {request.method} {request.url.path}: {error_msg}")
+    except Exception as e:
+        # Para otras excepciones
+        process_time = time.time() - start_time
+        error_msg = str(e)
+        logger.error(f"❌ Error en {method} {path}: {error_msg}")
+        
+        # Verificar si es un error relacionado con Azure Storage
+        if "azure_storage" in error_msg.lower() or "container_client" in error_msg.lower():
+            logger.error("⚠️ Error relacionado con Azure Storage - Verificando estado...")
+            
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": "El servicio de almacenamiento en la nube está temporalmente no disponible. Por favor, intente más tarde."
+                }
+            )
+            
+        # Error genérico para otras excepciones
         return JSONResponse(
             status_code=500,
-            content={"detail": "Error interno del servidor"}
+            content={
+                "detail": "Se produjo un error en el servidor. Por favor, intente más tarde."
+            }
         )
 
 # Incluir routers

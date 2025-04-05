@@ -1,10 +1,12 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks
 from resemblyzer import preprocess_wav, VoiceEncoder
 import numpy as np
 import librosa
 import io
 import os
 import logging
+import time
+import traceback
 from config import (
     VOICE_SIMILARITY_THRESHOLD,
     ENVIRONMENT,
@@ -31,12 +33,42 @@ logger.info(f"Ejecutando en entorno: {ENVIRONMENT}")
 
 router = APIRouter()
 mongo_client = MongoDBClient()
+
+# Crear una instancia global del codificador para reutilizarla
+voice_encoder = None
+
+def get_voice_encoder():
+    """
+    Retorna una instancia del codificador de voz, creándola si no existe.
+    """
+    global voice_encoder
+    if voice_encoder is None:
+        start_time = time.time()
+        logger.info("🔄 Inicializando modelo de codificación de voz...")
+        try:
+            voice_encoder = VoiceEncoder()
+            load_time = time.time() - start_time
+            logger.info(f"✅ Modelo de voz cargado en {load_time:.2f} segundos")
+        except Exception as e:
+            logger.error(f"❌ Error al cargar el modelo de voz: {str(e)}")
+            logger.error(traceback.format_exc())
+            return None
+    return voice_encoder
+
+# Inicializar el modelo de voz al arrancar
+try:
+    logger.info("🚀 Precargando modelo de codificación de voz...")
+    get_voice_encoder()
+except Exception as e:
+    logger.error(f"❌ Error al precargar el modelo de voz: {str(e)}")
+
 def extract_embedding(audio_path: str) -> np.ndarray:
     """
     Extrae el embedding de voz de un archivo de audio usando VoiceEncoder.
     """
     try:
         logger.info(f"Extrayendo embedding de {audio_path}")
+        start_time = time.time()
         
         # Verificar que el archivo existe y no está vacío
         if not os.path.exists(audio_path):
@@ -46,6 +78,21 @@ def extract_embedding(audio_path: str) -> np.ndarray:
         if os.path.getsize(audio_path) == 0:
             logger.error(f"El archivo {audio_path} está vacío")
             return None
+            
+        # Verificar tamaño máximo (15MB)
+        max_size = 15 * 1024 * 1024  # 15MB
+        if os.path.getsize(audio_path) > max_size:
+            logger.error(f"El archivo {audio_path} es demasiado grande: {os.path.getsize(audio_path)} bytes")
+            return None
+            
+        # Verificar duración máxima (10 segundos)
+        audio, sr = librosa.load(audio_path, sr=None)
+        duration = len(audio) / sr
+        if duration > 10:
+            logger.warning(f"⚠️ Audio demasiado largo: {duration:.2f}s > 10s, se truncará")
+            audio = audio[:int(10 * sr)]
+            # Guardar audio truncado
+            librosa.output.write_wav(audio_path, audio, sr)
 
         # Cargar y preprocesar el audio usando resemblyzer
         wav = preprocess_wav(audio_path)
@@ -55,17 +102,22 @@ def extract_embedding(audio_path: str) -> np.ndarray:
             logger.error("No se pudo cargar el audio o el audio está vacío")
             return None
             
-        # Crear el codificador si no existe
-        encoder = VoiceEncoder()
-        
+        # Obtener el codificador
+        encoder = get_voice_encoder()
+        if encoder is None:
+            logger.error("No se pudo obtener el codificador de voz")
+            return None
+            
         # Extraer embedding usando resemblyzer
         embedding = encoder.embed_utterance(wav)
         
-        logger.info(f"Embedding extraído correctamente. Tamaño: {len(embedding)}")
+        process_time = time.time() - start_time
+        logger.info(f"✅ Embedding extraído correctamente en {process_time:.2f}s. Tamaño: {len(embedding)}")
         return embedding.tolist()
 
     except Exception as e:
-        logger.error(f"Error al extraer embedding: {str(e)}")
+        logger.error(f"❌ Error al extraer embedding: {str(e)}")
+        logger.error(traceback.format_exc())
         return None
 
 def compare_voices(embedding1, embedding2):

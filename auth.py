@@ -211,6 +211,16 @@ async def login_with_voice(
     try:
         logger.info(f"🎤 Intento de login con voz para: {email}")
         
+        # Verificar tamaño del archivo
+        content = await voice_recording.read()
+        if len(content) > 15 * 1024 * 1024:  # 15MB
+            logger.warning(f"❌ Archivo demasiado grande: {len(content)} bytes")
+            raise HTTPException(status_code=400, detail="El archivo de audio es demasiado grande (máximo 15MB)")
+            
+        if len(content) == 0:
+            logger.warning("❌ Archivo vacío")
+            raise HTTPException(status_code=400, detail="El archivo de audio está vacío")
+        
         # Buscar usuario por email
         user = mongo_client.get_user_by_email(email)
         if not user:
@@ -239,10 +249,22 @@ async def login_with_voice(
             
         original_voice_path = f"{temp_dir}/original_{os.path.basename(user['voice_url']) if '/' in user['voice_url'] else user['voice_url']}"
         try:
-            # Descargar el archivo original
             logger.info(f"⬇️ Intentando descargar archivo de voz original a: {original_voice_path}")
             
-            original_path = await download_voice_recording(user['voice_url'], original_voice_path)
+            # Usar un timeout para la descarga
+            import asyncio
+            try:
+                # Establecer un timeout de 10 segundos para la descarga
+                original_path = await asyncio.wait_for(
+                    download_voice_recording(user['voice_url'], original_voice_path),
+                    timeout=10.0
+                )
+            except asyncio.TimeoutError:
+                logger.error("⏱️ Timeout al descargar el archivo de voz")
+                raise HTTPException(
+                    status_code=504, 
+                    detail="Tiempo de espera agotado al procesar la autenticación por voz. Por favor, intente más tarde."
+                )
             
             if not original_path:
                 logger.error("❌ No se pudo descargar el archivo de voz original")
@@ -255,70 +277,103 @@ async def login_with_voice(
             
             # Guardar el archivo temporal de la nueva grabación
             temp_file = f"{temp_dir}/temp_{voice_recording.filename}"
-            try:
-                with open(temp_file, "wb") as buffer:
-                    content = await voice_recording.read()
-                    if not content:
-                        raise HTTPException(status_code=400, detail="El archivo de voz está vacío")
-                    buffer.write(content)
-                    logger.info(f"💾 Archivo de voz guardado: {temp_file} ({len(content)} bytes)")
+            with open(temp_file, "wb") as buffer:
+                buffer.write(content)
+                logger.info(f"💾 Archivo de voz guardado: {temp_file} ({len(content)} bytes)")
 
-                # Verificar que el archivo tenga contenido significativo
-                y, sr = librosa.load(temp_file, sr=None)
-                if len(y) == 0:
-                    raise HTTPException(status_code=400, detail="El archivo de voz no contiene audio")
-                
-                # Calcular la energía del audio
-                energy = np.sum(np.abs(y))
-                logger.info(f"🔊 Energía del audio: {energy}")
-                if energy < 0.1:
-                    raise HTTPException(status_code=400, detail="El audio es demasiado silencioso")
+            # Verificar que el archivo tenga contenido significativo
+            y, sr = librosa.load(temp_file, sr=None)
+            if len(y) == 0:
+                raise HTTPException(status_code=400, detail="El archivo de voz no contiene audio")
+            
+            # Calcular la energía del audio
+            energy = np.sum(np.abs(y))
+            logger.info(f"🔊 Energía del audio: {energy}")
+            if energy < 0.1:
+                raise HTTPException(status_code=400, detail="El audio es demasiado silencioso")
 
-                # Extraer embeddings y comparar
-                logger.info(f"🧠 Extrayendo embedding del archivo de entrada: {temp_file}")
-                new_embedding = extract_embedding(temp_file)
+            # Extraer embeddings y comparar con timeout
+            logger.info(f"🧠 Extrayendo embedding del archivo de entrada: {temp_file}")
+            
+            import concurrent.futures
+            import threading
+            
+            # Función para ejecutar la extracción con un timeout
+            def extract_with_timeout(file_path, timeout=5):
+                result = [None]
+                def target():
+                    result[0] = extract_embedding(file_path)
                 
-                logger.info(f"🧠 Extrayendo embedding del archivo original: {original_path}")
-                original_embedding = extract_embedding(original_path)
+                thread = threading.Thread(target=target)
+                thread.daemon = True
+                thread.start()
+                thread.join(timeout)
                 
-                if new_embedding is None or original_embedding is None:
-                    logger.error("❌ Error al extraer embeddings de voz")
-                    raise HTTPException(status_code=400, detail="Error al procesar la voz")
-
-                # Comparar embeddings
-                logger.info("🔍 Comparando embeddings de voz...")
-                similarity = compare_voices(original_embedding, new_embedding)
-                logger.info(f"🎯 Similitud de voz: {similarity:.2f}, Umbral: {VOICE_SIMILARITY_THRESHOLD}")
-
-                if similarity < VOICE_SIMILARITY_THRESHOLD:
-                    logger.warning(f"❌ Similitud insuficiente: {similarity:.2f} < {VOICE_SIMILARITY_THRESHOLD}")
-                    raise HTTPException(status_code=401, detail="La voz no coincide")
-
-                # Si llegamos aquí, la voz coincide
-                logger.info(f"✅ Login exitoso para {email}")
-                
-                # Crear token
-                access_token = create_access_token(data={"sub": email})
-                
-                return LoginResponse(
-                    access_token=access_token,
-                    token_type="bearer",
-                    username=user.get("username"),
-                    email=email,
-                    voice_url=user.get("voice_url")
+                if thread.is_alive():
+                    logger.error(f"⏱️ Timeout al extraer embedding de {file_path}")
+                    return None
+                return result[0]
+            
+            # Extraer los embeddings con timeout
+            new_embedding = extract_with_timeout(temp_file)
+            if new_embedding is None:
+                logger.error("❌ Timeout al extraer embedding del archivo de entrada")
+                raise HTTPException(
+                    status_code=504,
+                    detail="Tiempo de espera agotado al procesar la voz. Por favor, intente de nuevo."
                 )
+                
+            original_embedding = extract_with_timeout(original_path)
+            if original_embedding is None:
+                logger.error("❌ Timeout al extraer embedding del archivo original")
+                raise HTTPException(
+                    status_code=504,
+                    detail="Tiempo de espera agotado al procesar la voz. Por favor, intente de nuevo."
+                )
+            
+            if new_embedding is None or original_embedding is None:
+                logger.error("❌ Error al extraer embeddings de voz")
+                raise HTTPException(status_code=400, detail="Error al procesar la voz")
 
-            finally:
-                # Limpiar archivos temporales
-                if temp_file and os.path.exists(temp_file):
-                    os.remove(temp_file)
-                    logger.debug("🧹 Archivo temporal eliminado")
+            # Comparar embeddings
+            logger.info("🔍 Comparando embeddings de voz...")
+            similarity = compare_voices(original_embedding, new_embedding)
+            logger.info(f"🎯 Similitud de voz: {similarity:.2f}, Umbral: {VOICE_SIMILARITY_THRESHOLD}")
+
+            if similarity < VOICE_SIMILARITY_THRESHOLD:
+                logger.warning(f"❌ Similitud insuficiente: {similarity:.2f} < {VOICE_SIMILARITY_THRESHOLD}")
+                raise HTTPException(status_code=401, detail="La voz no coincide")
+
+            # Si llegamos aquí, la voz coincide
+            logger.info(f"✅ Login exitoso para {email}")
+            
+            # Crear token
+            access_token = create_access_token(data={"sub": email})
+            
+            return LoginResponse(
+                access_token=access_token,
+                token_type="bearer",
+                username=user.get("username"),
+                email=email,
+                voice_url=user.get("voice_url")
+            )
 
         finally:
+            # Limpiar archivos temporales
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                    logger.debug("🧹 Archivo temporal eliminado")
+                except Exception as e:
+                    logger.warning(f"⚠️ No se pudo eliminar archivo temporal: {str(e)}")
+                    
             # Limpiar archivo original
             if original_path and os.path.exists(original_path):
-                os.remove(original_path)
-                logger.debug("🧹 Archivo original eliminado")
+                try:
+                    os.remove(original_path)
+                    logger.debug("🧹 Archivo original eliminado")
+                except Exception as e:
+                    logger.warning(f"⚠️ No se pudo eliminar archivo original: {str(e)}")
 
     except HTTPException:
         raise
