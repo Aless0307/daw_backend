@@ -379,4 +379,21 @@ async def ensure_azure_storage():
             logger.error("❌ No se pudo reconectar a Azure Storage")
             return False
     
-    return True 
+    return True
+
+def reset_connection():
+    """
+    Fuerza un reinicio de la conexión a Azure Storage independientemente del estado actual.
+    
+    Returns:
+        bool: True si la conexión fue exitosa, False en caso contrario
+    """
+    global blob_service_client, container_client, is_azure_available
+    
+    # Reiniciar variables globales
+    blob_service_client = None
+    container_client = None
+    is_azure_available = False
+    
+    logger.info("🔄 Reiniciando conexión a Azure Storage...")
+    return init_azure_storage() 

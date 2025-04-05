@@ -18,7 +18,7 @@ from config import (
 from auth import router as auth_router
 from voice_processing import router as voice_router
 from groq import router as groq_router
-from azure_storage import get_azure_status, verify_azure_storage
+from azure_storage import get_azure_status, verify_azure_storage, reset_connection
 
 # Configurar logging
 logging.basicConfig(
@@ -149,6 +149,15 @@ async def reconnect_azure():
                 "status": status
             }
         )
+
+# Ruta para reiniciar la conexión a Azure Storage
+@app.post("/admin/reset-azure")
+async def reset_azure():
+    """Reinicia la conexión a Azure Storage"""
+    reset_connection()
+    return {
+        "message": "Conexión a Azure Storage reiniciada correctamente"
+    }
 
 if __name__ == "__main__":
     import uvicorn
