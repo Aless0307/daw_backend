@@ -10,7 +10,8 @@ from config import (
     ENVIRONMENT,
     IS_PRODUCTION
 )
-from utils.auth_utils import get_current_user
+# Eliminar esta importación para evitar la circularidad
+# from utils.auth_utils import get_current_user
 from mongodb_client import MongoDBClient
 from scipy.spatial.distance import cosine
 from azure_storage import upload_voice_recording
@@ -20,8 +21,7 @@ logging.basicConfig(
     level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('voice_processing.log')
+        logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
@@ -188,13 +188,23 @@ async def compare_voice_samples(
 
 @router.post("/register-voice")
 async def register_voice(
-    current_user: dict = Depends(get_current_user),
-    voice_recording: UploadFile = File(...)
+    voice_recording: UploadFile = File(...),
+    # No importamos directamente get_current_user
+    current_user: dict = None
 ):
     """
     Registra una nueva muestra de voz para el usuario
     """
     try:
+        # Si no se proporcionó el usuario, importamos y usamos get_current_user
+        if current_user is None:
+            # Importar localmente para evitar importación circular
+            from utils.auth_utils import get_current_user
+            from fastapi import Depends
+            
+            # Si estamos en una solicitud real, esto se resolverá correctamente
+            current_user = Depends(get_current_user)
+        
         logger.info(f"Registrando nueva voz para: {current_user['email']}")
         
         # Guardar archivo temporalmente
@@ -232,6 +242,55 @@ async def register_voice(
         
     except Exception as e:
         logger.error(f"Error al registrar voz: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error al procesar el archivo de voz"
+        )
+
+@router.post("/analyze", status_code=200)
+async def analyze_voice(
+    voice_recording: UploadFile = File(...),
+    # Importar get_current_user localmente para evitar circularidad
+    current_user: dict = None
+):
+    """
+    Analiza una grabación de voz y devuelve su embedding.
+    
+    Args:
+        voice_recording: Archivo de audio a analizar
+        current_user: Usuario actual (opcional)
+        
+    Returns:
+        dict: Información del análisis de voz
+    """
+    try:
+        # Verificar si se requiere autenticación
+        if current_user is None:
+            # Importar localmente para evitar importación circular
+            from utils.auth_utils import get_current_user
+            from fastapi import Depends
+            
+            # Obtener el usuario actual si se requiere
+            current_user = Depends(get_current_user)
+        
+        logger.info("Extrayendo embedding de voz")
+        
+        # Guardar archivo temporalmente
+        temp_file_path = f"temp_{voice_recording.filename}"
+        with open(temp_file_path, "wb") as temp_file:
+            content = await voice_recording.read()
+            temp_file.write(content)
+        
+        # Extraer embedding
+        embedding = extract_embedding(temp_file_path)
+        
+        # Eliminar archivo temporal
+        os.remove(temp_file_path)
+        
+        return {"embedding": embedding}
+        
+    except Exception as e:
+        logger.error(f"Error al extraer embedding: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail="Error al procesar el archivo de voz"

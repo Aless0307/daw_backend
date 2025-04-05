@@ -7,6 +7,11 @@ from datetime import timedelta
 # Cargar variables de entorno
 load_dotenv()
 
+# Configuración de logging
+# Configurar nivel de logging para pymongo
+logging.getLogger("pymongo").setLevel(logging.WARNING)
+logging.getLogger("azure").setLevel(logging.WARNING)
+
 # Detección del entorno
 def get_environment():
     """

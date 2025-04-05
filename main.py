@@ -86,19 +86,20 @@ async def add_process_time_header(request: Request, call_next):
     start_time = time.time()
     
     # Log de la solicitud entrante
-    logger.info(f"Solicitud recibida: {request.method} {request.url}")
+    logger.info(f"📥 {request.method} {request.url.path}")
     
     try:
         response = await call_next(request)
         process_time = time.time() - start_time
         response.headers["X-Process-Time"] = str(process_time)
         
-        # Log de la respuesta
-        logger.info(f"Respuesta enviada: {response.status_code} en {process_time:.2f}s")
+        # Log de la respuesta con emojis según el código de estado
+        status_emoji = "✅" if response.status_code < 400 else "❌"
+        logger.info(f"{status_emoji} {response.status_code} - {request.method} {request.url.path} ({process_time:.2f}s)")
         
         return response
     except Exception as e:
-        logger.error(f"Error procesando la solicitud: {str(e)}")
+        logger.error(f"❌ Error en {request.method} {request.url.path}: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={"detail": "Error interno del servidor"}

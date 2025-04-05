@@ -3,6 +3,7 @@ from pymongo.errors import ServerSelectionTimeoutError
 import logging
 from keys import MONGODB_URI, DATABASE_NAME
 from typing import Optional
+from config import VOICE_SIMILARITY_THRESHOLD
 
 # Configurar logging
 logging.basicConfig(
@@ -170,16 +171,20 @@ class MongoDBClient:
         """
         try:
             logger.info(f"Verificando credenciales para: {email}")
-            user = self._db.users.find_one({
-                "email": email,
-                "password": password
-            })
             
-            if user:
+            # Primero, buscar el usuario por email
+            user = self._db.users.find_one({"email": email})
+            
+            if not user:
+                logger.warning(f"Usuario no encontrado para el email: {email}")
+                return None
+                
+            # Verificar la contraseña
+            if user.get("password") == password:
                 logger.info(f"Credenciales válidas para: {email}")
                 return user
             else:
-                logger.warning(f"Credenciales inválidas para: {email}")
+                logger.warning(f"Contraseña incorrecta para: {email}")
                 return None
                 
         except Exception as e:
@@ -197,6 +202,9 @@ class MongoDBClient:
             Optional[dict]: Usuario encontrado o None
         """
         try:
+            # Importar localmente para evitar importación circular
+            from voice_processing import compare_voices
+            
             logger.info("Buscando usuario por voz")
             
             # Obtener todos los usuarios con embedding de voz

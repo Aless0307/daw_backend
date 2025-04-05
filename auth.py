@@ -70,14 +70,23 @@ async def register(
             logger.warning(f"Intento de registro con email ya existente: {email}")
             raise HTTPException(status_code=400, detail="El email ya está registrado")
 
+        # Hashear la contraseña
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        logger.debug(f"Contraseña hasheada para: {email}")
+
         # Procesar la grabación de voz si se proporciona
         voice_embedding = None
         voice_url = None
         if voice_recording:
             logger.info("Procesando grabación de voz")
             
+            # Crear directorio temporal
+            temp_dir = "./temp_files"
+            if not os.path.exists(temp_dir):
+                os.makedirs(temp_dir)
+                
             # Guardar archivo temporalmente
-            temp_file = f"temp_{voice_recording.filename}"
+            temp_file = f"{temp_dir}/temp_{voice_recording.filename}"
             try:
                 with open(temp_file, "wb") as buffer:
                     content = await voice_recording.read()
@@ -93,26 +102,30 @@ async def register(
 
                 # Subir a Azure Storage
                 voice_url = await upload_voice_recording(temp_file, email)
-                logger.info(f"Archivo subido a Azure. URL: {voice_url}")
+                if not voice_url:
+                    logger.error("❌ No se pudo subir la grabación a Azure Storage")
+                    raise HTTPException(status_code=500, detail="Error al procesar la voz")
+                    
+                logger.info(f"📤 Archivo subido a Azure. URL: {voice_url}")
 
             finally:
                 # Limpiar archivo temporal
                 if os.path.exists(temp_file):
                     os.remove(temp_file)
-                    logger.info("Archivo temporal eliminado")
+                    logger.debug("🧹 Archivo temporal eliminado")
 
         # Crear usuario
         logger.info("Creando usuario en MongoDB")
         success = mongo_client.create_user(
             username=username,
             email=email,
-            password=password,
+            password=hashed_password,  # Usar la contraseña hasheada
             voice_embedding=voice_embedding,
             voice_url=voice_url
         )
 
         if success:
-            logger.info(f"Usuario registrado exitosamente: {email}")
+            logger.info(f"✅ Usuario registrado exitosamente: {email}")
             # Crear token de acceso
             access_token = create_access_token(data={"sub": email})
             return LoginResponse(
@@ -123,13 +136,13 @@ async def register(
                 voice_url=voice_url
             )
         else:
-            logger.error(f"Error al crear usuario en la base de datos: {email}")
+            logger.error(f"❌ Error al crear usuario en la base de datos: {email}")
             raise HTTPException(status_code=500, detail="Error al crear el usuario")
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al registrar usuario: {str(e)}")
+        logger.error(f"❌ Error al registrar usuario: {str(e)}")
         raise HTTPException(status_code=500, detail="Error en el servidor")
 
 @router.post("/login", response_model=LoginResponse)
@@ -138,14 +151,17 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     Inicia sesión con credenciales (usuario y contraseña)
     """
     try:
-        logger.info(f"Intento de inicio de sesión para: {form_data.username}")
+        email = form_data.username  # En OAuth2PasswordRequestForm el email se envía como username
+        logger.info(f"🔑 Intento de inicio de sesión para: {email}")
         
         # Hashear la contraseña
         hashed_password = hashlib.sha256(form_data.password.encode()).hexdigest()
+        logger.debug(f"Contraseña hasheada para login: {email}")
         
         # Verificar credenciales
-        user = mongo_client.verify_user_credentials(form_data.username, hashed_password)
+        user = mongo_client.verify_user_credentials(email, hashed_password)
         if not user:
+            logger.warning(f"❌ Credenciales incorrectas para: {email}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Credenciales incorrectas",
@@ -159,6 +175,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             expires_delta=access_token_expires
         )
         
+        logger.info(f"✅ Login exitoso para: {email}")
+        
         return LoginResponse(
             access_token=access_token,
             token_type="bearer",
@@ -168,7 +186,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
         
     except Exception as e:
-        logger.error(f"Error en el login: {str(e)}")
+        logger.error(f"❌ Error en el login: {str(e)}")
         if isinstance(e, HTTPException):
             raise
         raise HTTPException(
@@ -182,35 +200,42 @@ async def login_with_voice(
     voice_recording: UploadFile = File(...)
 ):
     try:
-        logger.info(f"Intento de login con voz para el email: {email}")
+        logger.info(f"🎤 Intento de login con voz para: {email}")
         
         # Buscar usuario por email
         user = mongo_client.get_user_by_email(email)
         if not user:
-            logger.warning(f"Usuario no encontrado para el email: {email}")
+            logger.warning(f"❌ Usuario no encontrado: {email}")
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
         # Verificar que el usuario tenga un embedding de voz registrado
         if not user.get('voice_url'):
-            logger.warning(f"Usuario {email} no tiene archivo de voz registrado")
+            logger.warning(f"⚠️ Usuario {email} no tiene voz registrada")
             raise HTTPException(status_code=400, detail="No hay voz registrada para este usuario")
 
         # Descargar el archivo WAV original de Azure Storage
-        original_voice_path = f"original_{user['voice_url'].split('/')[-1]}"
+        temp_dir = "./temp_files"
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+            
+        original_voice_path = f"{temp_dir}/original_{os.path.basename(user['voice_url']) if '/' in user['voice_url'] else user['voice_url']}"
         try:
             # Descargar el archivo original
-            await download_voice_recording(user['voice_url'], original_voice_path)
-            logger.info(f"Archivo original descargado: {original_voice_path}")
+            original_path = await download_voice_recording(user['voice_url'], original_voice_path)
+            if not original_path:
+                logger.error("❌ No se pudo descargar el archivo de voz original")
+                raise HTTPException(status_code=500, detail="Error al procesar la voz")
+            logger.info(f"📥 Archivo original descargado: {original_path}")
 
             # Guardar el archivo temporal de la nueva grabación
-            temp_file = f"temp_{voice_recording.filename}"
+            temp_file = f"{temp_dir}/temp_{voice_recording.filename}"
             try:
                 with open(temp_file, "wb") as buffer:
                     content = await voice_recording.read()
                     if not content:
                         raise HTTPException(status_code=400, detail="El archivo de voz está vacío")
                     buffer.write(content)
-                    logger.info(f"Archivo de voz guardado temporalmente: {temp_file}")
+                    logger.info(f"💾 Archivo de voz guardado: {temp_file}")
 
                 # Verificar que el archivo tenga contenido significativo
                 y, sr = librosa.load(temp_file, sr=None)
@@ -219,46 +244,36 @@ async def login_with_voice(
                 
                 # Calcular la energía del audio
                 energy = np.sum(np.abs(y))
-                if energy < 0.1:  # Umbral de energía mínimo
+                if energy < 0.1:
                     raise HTTPException(status_code=400, detail="El audio es demasiado silencioso")
 
-                # Extraer embedding de la nueva grabación
+                # Extraer embeddings y comparar
                 new_embedding = extract_embedding(temp_file)
-                if new_embedding is None:
-                    raise HTTPException(status_code=400, detail="No se pudo extraer el embedding de la voz")
-
-                # Extraer embedding del archivo original
-                original_embedding = extract_embedding(original_voice_path)
-                if original_embedding is None:
-                    raise HTTPException(status_code=400, detail="No se pudo extraer el embedding de la voz original")
-
-                logger.info(f"Embedding original tipo: {type(original_embedding)}, longitud: {len(original_embedding) if isinstance(original_embedding, (list, np.ndarray)) else 'N/A'}")
-                logger.info(f"Embedding nuevo tipo: {type(new_embedding)}, longitud: {len(new_embedding) if isinstance(new_embedding, (list, np.ndarray)) else 'N/A'}")
+                original_embedding = extract_embedding(original_path)
+                
+                if new_embedding is None or original_embedding is None:
+                    logger.error("❌ Error al extraer embeddings de voz")
+                    raise HTTPException(status_code=400, detail="Error al procesar la voz")
 
                 # Comparar embeddings
-                similarity = compare_voices(
-                    original_embedding,
-                    new_embedding
-                )
-                logger.info(f"Similitud de voz calculada: {similarity}")
+                similarity = compare_voices(original_embedding, new_embedding)
+                logger.info(f"🎯 Similitud de voz: {similarity:.2f}")
 
-                # Umbral de similitud (ajustar según sea necesario)
-                SIMILARITY_THRESHOLD = 0.7
-                if similarity < SIMILARITY_THRESHOLD:
-                    logger.warning(f"Similitud de voz insuficiente: {similarity} < {SIMILARITY_THRESHOLD}")
+                if similarity < VOICE_SIMILARITY_THRESHOLD:
+                    logger.warning(f"❌ Similitud insuficiente: {similarity:.2f} < {VOICE_SIMILARITY_THRESHOLD}")
                     raise HTTPException(status_code=401, detail="La voz no coincide")
 
-                # Generar token de acceso
-                access_token = create_access_token(
-                    data={"sub": user["email"]},
-                    expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-                )
-
+                # Si llegamos aquí, la voz coincide
+                logger.info(f"✅ Login exitoso para {email}")
+                
+                # Crear token
+                access_token = create_access_token(data={"sub": email})
+                
                 return LoginResponse(
                     access_token=access_token,
                     token_type="bearer",
                     username=user.get("username"),
-                    email=user["email"],
+                    email=email,
                     voice_url=user.get("voice_url")
                 )
 
@@ -266,19 +281,22 @@ async def login_with_voice(
                 # Limpiar archivos temporales
                 if os.path.exists(temp_file):
                     os.remove(temp_file)
-                    logger.info(f"Archivo temporal eliminado: {temp_file}")
+                    logger.debug("🧹 Archivo temporal eliminado")
 
         finally:
-            # Limpiar archivo original descargado
-            if os.path.exists(original_voice_path):
-                os.remove(original_voice_path)
-                logger.info(f"Archivo original eliminado: {original_voice_path}")
+            # Limpiar archivo original
+            if os.path.exists(original_path):
+                os.remove(original_path)
+                logger.debug("🧹 Archivo original eliminado")
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error en login con voz: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error en el servidor")
+        logger.error(f"❌ Error en login con voz: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error al procesar la autenticación por voz"
+        )
 
 @router.get("/me", response_model=LoginResponse)
 async def read_users_me(current_user: dict = Depends(get_current_user)):
