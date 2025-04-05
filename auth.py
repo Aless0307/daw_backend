@@ -9,7 +9,7 @@ import os
 from utils.auth_utils import create_access_token, get_current_user
 from mongodb_client import MongoDBClient
 from voice_processing import extract_embedding, compare_voices
-from azure_storage import upload_voice_recording, download_voice_recording
+from azure_storage import upload_voice_recording, download_voice_recording, ensure_azure_storage
 from config import (
     SECRET_KEY, 
     ACCESS_TOKEN_EXPIRE_MINUTES, 
@@ -77,42 +77,47 @@ async def register(
         # Procesar la grabación de voz si se proporciona
         voice_embedding = None
         voice_url = None
+        temp_file = None
+        
         if voice_recording:
             logger.info("Procesando grabación de voz")
             
-            # Crear directorio temporal
-            temp_dir = "./temp_files"
-            if not os.path.exists(temp_dir):
-                os.makedirs(temp_dir)
-                
-            # Guardar archivo temporalmente
-            temp_file = f"{temp_dir}/temp_{voice_recording.filename}"
-            try:
-                with open(temp_file, "wb") as buffer:
-                    content = await voice_recording.read()
-                    if not content:
-                        raise HTTPException(status_code=400, detail="El archivo de voz está vacío")
-                    buffer.write(content)
-                    logger.info(f"Archivo de voz guardado temporalmente: {temp_file}")
-
-                # Extraer embedding
-                voice_embedding = extract_embedding(temp_file)
-                if voice_embedding is None:
-                    raise HTTPException(status_code=400, detail="No se pudo extraer el embedding de la voz")
-
-                # Subir a Azure Storage
-                voice_url = await upload_voice_recording(temp_file, email)
-                if not voice_url:
-                    logger.error("❌ No se pudo subir la grabación a Azure Storage")
-                    raise HTTPException(status_code=500, detail="Error al procesar la voz")
+            # Verificar disponibilidad de Azure Storage si se va a subir una grabación
+            if not await ensure_azure_storage():
+                logger.warning("⚠️ Azure Storage no está disponible. El usuario se registrará sin voz.")
+                # No lanzamos excepción para permitir el registro sin voz
+            else:
+                # Crear directorio temporal
+                temp_dir = "./temp_files"
+                if not os.path.exists(temp_dir):
+                    os.makedirs(temp_dir)
                     
-                logger.info(f"📤 Archivo subido a Azure. URL: {voice_url}")
+                # Guardar archivo temporalmente
+                temp_file = f"{temp_dir}/temp_{voice_recording.filename}"
+                try:
+                    with open(temp_file, "wb") as buffer:
+                        content = await voice_recording.read()
+                        if not content:
+                            raise HTTPException(status_code=400, detail="El archivo de voz está vacío")
+                        buffer.write(content)
+                        logger.info(f"Archivo de voz guardado temporalmente: {temp_file}")
 
-            finally:
-                # Limpiar archivo temporal
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
-                    logger.debug("🧹 Archivo temporal eliminado")
+                    # Extraer embedding
+                    voice_embedding = extract_embedding(temp_file)
+                    if voice_embedding is None:
+                        logger.warning("⚠️ No se pudo extraer el embedding de la voz")
+                    else:
+                        # Subir a Azure Storage
+                        voice_url = await upload_voice_recording(temp_file, email)
+                        if not voice_url:
+                            logger.error("❌ No se pudo subir la grabación a Azure Storage")
+                        else:
+                            logger.info(f"📤 Archivo subido a Azure. URL: {voice_url}")
+                finally:
+                    # Limpiar archivo temporal
+                    if temp_file and os.path.exists(temp_file):
+                        os.remove(temp_file)
+                        logger.debug("🧹 Archivo temporal eliminado")
 
         # Crear usuario
         logger.info("Creando usuario en MongoDB")
@@ -199,6 +204,10 @@ async def login_with_voice(
     email: str = Form(...),
     voice_recording: UploadFile = File(...)
 ):
+    # Inicializar variable para evitar error de referencia
+    original_path = None
+    temp_file = None
+    
     try:
         logger.info(f"🎤 Intento de login con voz para: {email}")
         
@@ -215,6 +224,14 @@ async def login_with_voice(
 
         logger.info(f"🔍 Voice URL del usuario: {user['voice_url']}")
 
+        # Verificar disponibilidad de Azure Storage
+        if not await ensure_azure_storage():
+            logger.error("❌ Azure Storage no está disponible")
+            raise HTTPException(
+                status_code=503, 
+                detail="El servicio de autenticación por voz no está disponible. Por favor, intente más tarde o use otro método de inicio de sesión."
+            )
+
         # Descargar el archivo WAV original de Azure Storage
         temp_dir = "./temp_files"
         if not os.path.exists(temp_dir):
@@ -224,22 +241,15 @@ async def login_with_voice(
         try:
             # Descargar el archivo original
             logger.info(f"⬇️ Intentando descargar archivo de voz original a: {original_voice_path}")
+            
             original_path = await download_voice_recording(user['voice_url'], original_voice_path)
             
             if not original_path:
                 logger.error("❌ No se pudo descargar el archivo de voz original")
-                # Intentar verificar si Azure Storage está disponible
-                from azure_storage import is_azure_available
-                if not is_azure_available:
-                    logger.error("❌ Azure Storage no está disponible. Verificando credenciales de autenticación tradicional.")
-                    # Comprobar si el usuario existe pero sin verificación de voz
-                    # Esta es una solución temporal mientras se resuelve el problema de Azure
-                    raise HTTPException(
-                        status_code=503, 
-                        detail="El servicio de autenticación por voz no está disponible. Por favor, intente más tarde o use otro método de inicio de sesión."
-                    )
-                else:
-                    raise HTTPException(status_code=500, detail="Error al procesar la voz")
+                raise HTTPException(
+                    status_code=503, 
+                    detail="El servicio de autenticación por voz no está disponible. Por favor, intente más tarde o use otro método de inicio de sesión."
+                )
                     
             logger.info(f"📥 Archivo original descargado: {original_path}")
             
@@ -300,7 +310,7 @@ async def login_with_voice(
 
             finally:
                 # Limpiar archivos temporales
-                if os.path.exists(temp_file):
+                if temp_file and os.path.exists(temp_file):
                     os.remove(temp_file)
                     logger.debug("🧹 Archivo temporal eliminado")
 

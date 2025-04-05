@@ -30,6 +30,21 @@ blob_service_client = None
 container_client = None
 is_azure_available = False
 
+# Verificar inicialmente el acceso a Azure
+try:
+    logger.info("🔍 Verificando variables de entorno para Azure Storage...")
+    if not AZURE_STORAGE_CONNECTION_STRING or AZURE_STORAGE_CONNECTION_STRING.strip() == "":
+        logger.warning("⚠️ AZURE_STORAGE_CONNECTION_STRING no configurada o vacía")
+        is_azure_available = False
+    elif not AZURE_CONTAINER_NAME or AZURE_CONTAINER_NAME.strip() == "":
+        logger.warning("⚠️ AZURE_CONTAINER_NAME no configurado o vacío")
+        is_azure_available = False
+    else:
+        logger.info("✅ Variables de entorno para Azure Storage configuradas correctamente")
+except Exception as e:
+    logger.error(f"❌ Error al verificar variables de Azure: {str(e)}")
+    is_azure_available = False
+
 def init_azure_storage():
     """
     Inicializa la conexión con Azure Storage.
@@ -144,10 +159,13 @@ async def upload_voice_recording(file_path: str, user_email: str) -> str:
     Returns:
         str: URL de vista previa del archivo con token SAS o None si falla
     """
-    if not is_azure_available:
-        logger.warning("Azure Storage no disponible, no se puede subir el archivo")
+    global is_azure_available
+    
+    # Comprobar disponibilidad de Azure y reintentar si es necesario
+    if not await ensure_azure_storage():
+        logger.error("❌ Azure Storage no está disponible, imposible subir archivo")
         return None
-        
+    
     try:
         # Verificar que el archivo existe
         if not os.path.exists(file_path):
@@ -200,14 +218,12 @@ async def download_voice_recording(blob_url: str, local_path: str = None) -> str
     Returns:
         str: Ruta local del archivo descargado o None si falla
     """
-    if not is_azure_available:
-        logger.warning("⚠️ Azure Storage no disponible, no se puede descargar el archivo")
-        
-        # Verificar si podemos reconectar
-        logger.info("🔄 Intentando reconectar a Azure Storage...")
-        if not init_azure_storage():
-            logger.error("❌ Reconexión a Azure Storage fallida")
-            return None
+    global is_azure_available
+    
+    # Comprobar disponibilidad de Azure y reintentar si es necesario
+    if not await ensure_azure_storage():
+        logger.error("❌ Azure Storage no está disponible, imposible descargar archivo")
+        return None
     
     try:
         # Validar parámetros
@@ -326,4 +342,41 @@ def get_azure_status():
         "available": is_azure_available,
         "container": AZURE_CONTAINER_NAME if is_azure_available else None,
         "last_check": datetime.now().isoformat()
-    } 
+    }
+
+def verify_azure_storage():
+    """
+    Verifica el estado de Azure Storage y reintenta la conexión si es necesario.
+    
+    Returns:
+        bool: True si Azure Storage está disponible, False en caso contrario
+    """
+    global is_azure_available
+    
+    if is_azure_available:
+        logger.info("✅ Azure Storage ya está disponible")
+        return True
+        
+    logger.info("🔄 Intentando reconectar a Azure Storage...")
+    return init_azure_storage()
+
+# Verificar el estado cuando una solicitud llega desde endpoints críticos
+async def ensure_azure_storage():
+    """
+    Asegura que Azure Storage esté disponible, reiniciando la conexión si es necesario.
+    
+    Returns:
+        bool: True si Azure Storage está disponible, False en caso contrario
+    """
+    global is_azure_available
+    
+    if not is_azure_available:
+        logger.warning("⚠️ Azure Storage no disponible, intentando reconectar...")
+        if init_azure_storage():
+            logger.info("✅ Reconexión a Azure Storage exitosa")
+            return True
+        else:
+            logger.error("❌ No se pudo reconectar a Azure Storage")
+            return False
+    
+    return True 

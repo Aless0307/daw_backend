@@ -216,8 +216,15 @@ async def register_voice(
         # Extraer embedding
         voice_embedding = extract_embedding(temp_file_path)
         
-        # Subir a Azure Storage
-        voice_url = upload_voice_recording(temp_file_path)
+        # Subir a Azure Storage - llamado asíncrono con el email
+        voice_url = await upload_voice_recording(temp_file_path, current_user["email"])
+        
+        if not voice_url:
+            logger.error("❌ No se pudo subir el archivo de voz a Azure Storage")
+            raise HTTPException(
+                status_code=503,
+                detail="Error al subir archivo de voz a Azure Storage"
+            )
         
         # Eliminar archivo temporal
         os.remove(temp_file_path)

@@ -1,5 +1,5 @@
 # daw_backend/main.py
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import time
@@ -18,7 +18,7 @@ from config import (
 from auth import router as auth_router
 from voice_processing import router as voice_router
 from groq import router as groq_router
-from azure_storage import get_azure_status
+from azure_storage import get_azure_status, verify_azure_storage
 
 # Configurar logging
 logging.basicConfig(
@@ -99,7 +99,18 @@ async def add_process_time_header(request: Request, call_next):
         
         return response
     except Exception as e:
-        logger.error(f"❌ Error en {request.method} {request.url.path}: {str(e)}")
+        process_time = time.time() - start_time
+        error_msg = str(e)
+        
+        # Errores específicos
+        if "UnboundLocalError: local variable" in error_msg and "azure_storage" in error_msg:
+            logger.error(f"❌ Error de Azure Storage: {error_msg}")
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "El servicio de autenticación por voz no está disponible temporalmente. Por favor, intente más tarde o use otro método de inicio de sesión."}
+            )
+            
+        logger.error(f"❌ Error en {request.method} {request.url.path}: {error_msg}")
         return JSONResponse(
             status_code=500,
             content={"detail": "Error interno del servidor"}
@@ -109,6 +120,35 @@ async def add_process_time_header(request: Request, call_next):
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(voice_router, prefix="/voice", tags=["voice"])
 app.include_router(groq_router, prefix="/groq", tags=["groq"])
+
+# Ruta para verificar el estado de la API
+@app.get("/status")
+async def check_status():
+    return {
+        "status": "online",
+        "azure_storage": get_azure_status()
+    }
+
+# Ruta para verificar y reintentar la conexión a Azure Storage
+@app.post("/admin/reconnect-azure")
+async def reconnect_azure():
+    """Intenta reconectar a Azure Storage"""
+    success = verify_azure_storage()
+    status = get_azure_status()
+    
+    if success:
+        return {
+            "message": "Conexión a Azure Storage establecida correctamente",
+            "status": status
+        }
+    else:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "message": "No se pudo establecer conexión a Azure Storage",
+                "status": status
+            }
+        )
 
 if __name__ == "__main__":
     import uvicorn
