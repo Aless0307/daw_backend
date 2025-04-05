@@ -5,7 +5,11 @@ import librosa
 import io
 import os
 import logging
-from config import VOICE_SIMILARITY_THRESHOLD
+from config import (
+    VOICE_SIMILARITY_THRESHOLD,
+    ENVIRONMENT,
+    IS_PRODUCTION
+)
 from utils.auth_utils import get_current_user
 from mongodb_client import MongoDBClient
 from scipy.spatial.distance import cosine
@@ -13,7 +17,7 @@ from azure_storage import upload_voice_recording
 
 # Configurar logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
@@ -21,6 +25,9 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Log del entorno actual
+logger.info(f"Ejecutando en entorno: {ENVIRONMENT}")
 
 router = APIRouter()
 mongo_client = MongoDBClient()

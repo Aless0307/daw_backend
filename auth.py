@@ -10,14 +10,20 @@ from utils.auth_utils import create_access_token, get_current_user
 from mongodb_client import MongoDBClient
 from voice_processing import extract_embedding, compare_voices
 from azure_storage import upload_voice_recording, download_voice_recording
-from config import SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES, VOICE_SIMILARITY_THRESHOLD
+from config import (
+    SECRET_KEY, 
+    ACCESS_TOKEN_EXPIRE_MINUTES, 
+    VOICE_SIMILARITY_THRESHOLD,
+    ENVIRONMENT,
+    IS_PRODUCTION
+)
 from pydantic import BaseModel
 import librosa
 import numpy as np
 
 # Configurar logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
@@ -25,6 +31,9 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Log del entorno actual
+logger.info(f"Ejecutando en entorno: {ENVIRONMENT}")
 
 router = APIRouter()
 mongo_client = MongoDBClient()

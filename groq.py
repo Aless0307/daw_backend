@@ -2,12 +2,17 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
 import logging
 import requests
-from config import GROQ_API_KEY, REQUEST_TIMEOUT
+from config import (
+    GROQ_API_KEY, 
+    REQUEST_TIMEOUT,
+    ENVIRONMENT,
+    IS_PRODUCTION
+)
 from utils.auth_utils import get_current_user
 
 # Configurar logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
@@ -15,6 +20,9 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Log del entorno actual
+logger.info(f"Ejecutando en entorno: {ENVIRONMENT}")
 
 router = APIRouter()
 

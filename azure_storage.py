@@ -3,12 +3,17 @@ from datetime import datetime, timedelta
 import os
 import uuid
 import logging
-from config import AZURE_STORAGE_CONNECTION_STRING, AZURE_CONTAINER_NAME
+from config import (
+    AZURE_STORAGE_CONNECTION_STRING, 
+    AZURE_CONTAINER_NAME,
+    ENVIRONMENT,
+    IS_PRODUCTION
+)
 from urllib.parse import unquote
 
 # Configurar logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
@@ -16,6 +21,9 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Log del entorno actual
+logger.info(f"Ejecutando en entorno: {ENVIRONMENT}")
 
 # Crear cliente de Azure Storage
 blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
