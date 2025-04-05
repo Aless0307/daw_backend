@@ -22,24 +22,41 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Log del entorno actual
-logger.info(f"Ejecutando en entorno: {ENVIRONMENT}")
+# Variables globales para los clientes
+blob_service_client = None
+container_client = None
+is_azure_available = False
 
-# Crear cliente de Azure Storage
-blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
-container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME)
+def init_azure_storage():
+    """
+    Inicializa la conexión con Azure Storage.
+    Returns:
+        bool: True si la conexión fue exitosa, False en caso contrario
+    """
+    global blob_service_client, container_client, is_azure_available
+    
+    try:
+        # Crear cliente de Azure Storage
+        blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+        container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME)
+        
+        # Verificar conexión
+        container_client.get_container_properties()
+        
+        is_azure_available = True
+        logger.info("Conexión a Azure Storage establecida correctamente")
+        return True
+        
+    except Exception as e:
+        is_azure_available = False
+        if IS_PRODUCTION:
+            logger.error(f"Error al conectar con Azure Storage: {str(e)}")
+        else:
+            logger.warning("Azure Storage no disponible en desarrollo")
+        return False
 
-# Crear contenedor si no existe
-try:
-    if not container_client.exists():
-        logger.info(f"Creando contenedor {AZURE_CONTAINER_NAME}")
-        container_client.create_container()
-        logger.info(f"Contenedor {AZURE_CONTAINER_NAME} creado exitosamente")
-    else:
-        logger.info(f"Contenedor {AZURE_CONTAINER_NAME} ya existe")
-except Exception as e:
-    logger.error(f"Error al verificar/crear contenedor: {str(e)}")
-    raise
+# Intentar inicializar Azure Storage al importar el módulo
+init_azure_storage()
 
 async def upload_voice_recording(file_path: str, user_email: str) -> str:
     """
@@ -50,8 +67,12 @@ async def upload_voice_recording(file_path: str, user_email: str) -> str:
         user_email: Email del usuario para nombrar el archivo
         
     Returns:
-        str: URL de vista previa del archivo con token SAS
+        str: URL de vista previa del archivo con token SAS o None si falla
     """
+    if not is_azure_available:
+        logger.warning("Azure Storage no disponible, no se puede subir el archivo")
+        return None
+        
     try:
         # Generar nombre único para el archivo
         file_name = f"voices/{user_email}_{os.path.basename(file_path)}"
@@ -85,37 +106,50 @@ async def upload_voice_recording(file_path: str, user_email: str) -> str:
         
     except Exception as e:
         logger.error(f"Error al subir archivo a Azure Storage: {str(e)}")
-        raise
+        return None
 
-async def download_voice_recording(blob_url: str, local_path: str) -> None:
+async def download_voice_recording(file_name: str) -> str:
     """
     Descarga un archivo de audio de Azure Storage.
     
     Args:
-        blob_url: URL del blob en Azure Storage
-        local_path: Ruta local donde guardar el archivo
-    """
-    try:
-        # Extraer el nombre del blob de la URL y decodificarlo
-        # La URL tiene formato: https://<account>.blob.core.windows.net/<container>/<blob_name>?<sas_token>
-        # Necesitamos extraer solo el <blob_name> y decodificarlo
-        blob_name = unquote(blob_url.split(f"{AZURE_CONTAINER_NAME}/")[1].split("?")[0])
-        logger.info(f"Descargando archivo (nombre decodificado): {blob_name}")
+        file_name: Nombre del archivo a descargar
         
+    Returns:
+        str: Ruta local del archivo descargado o None si falla
+    """
+    if not is_azure_available:
+        logger.warning("Azure Storage no disponible, no se puede descargar el archivo")
+        return None
+        
+    try:
         # Crear cliente para el blob usando el nombre del blob decodificado
-        blob_client = container_client.get_blob_client(blob_name)
+        blob_client = container_client.get_blob_client(file_name)
         
         # Verificar si el blob existe
         if not blob_client.exists():
-            logger.error(f"El blob {blob_name} no existe en el contenedor {AZURE_CONTAINER_NAME}")
-            raise Exception(f"El archivo de voz {blob_name} no existe en el almacenamiento")
+            logger.error(f"El blob {file_name} no existe en el contenedor {AZURE_CONTAINER_NAME}")
+            raise Exception(f"El archivo de voz {file_name} no existe en el almacenamiento")
         
         # Descargar archivo
+        local_path = f"/tmp/{file_name}"
         with open(local_path, "wb") as download_file:
             download_file.write(blob_client.download_blob().readall())
             
         logger.info(f"Archivo descargado exitosamente a: {local_path}")
         
+        return local_path
+        
     except Exception as e:
         logger.error(f"Error al descargar archivo de Azure Storage: {str(e)}")
-        raise 
+        return None
+
+def get_azure_status():
+    """
+    Devuelve el estado actual de la conexión con Azure Storage.
+    """
+    return {
+        "available": is_azure_available,
+        "container": AZURE_CONTAINER_NAME if is_azure_available else None,
+        "last_check": datetime.now().isoformat()
+    } 

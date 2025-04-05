@@ -18,6 +18,7 @@ from config import (
 from auth import router as auth_router
 from voice_processing import router as voice_router
 from groq import router as groq_router
+from azure_storage import get_azure_status
 
 # Configurar logging
 logging.basicConfig(
@@ -48,12 +49,19 @@ app.add_middleware(
 @app.get("/health")
 async def health_check():
     """
-    Ruta de healthcheck para Railway
+    Ruta de healthcheck para Railway.
+    Siempre devuelve 200 OK, pero incluye el estado de los servicios.
     """
+    services_status = {
+        "azure_storage": get_azure_status(),
+        "groq_api": {"available": bool(GROQ_API_KEY)}
+    }
+    
     return {
         "status": "healthy",
         "environment": ENVIRONMENT,
-        "timestamp": time.time()
+        "timestamp": time.time(),
+        "services": services_status
     }
 
 @app.get("/")
@@ -65,7 +73,11 @@ async def root():
         "status": "healthy",
         "message": "API de DAW funcionando correctamente",
         "environment": ENVIRONMENT,
-        "is_production": IS_PRODUCTION
+        "is_production": IS_PRODUCTION,
+        "services": {
+            "azure_storage": get_azure_status(),
+            "groq_api": {"available": bool(GROQ_API_KEY)}
+        }
     }
 
 # Middleware para medir tiempo de procesamiento y logging
