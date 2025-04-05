@@ -23,6 +23,9 @@ def get_environment():
 ENVIRONMENT = get_environment()
 IS_PRODUCTION = ENVIRONMENT == "production"
 
+# Obtener el puerto de Railway o usar el default
+PORT = int(os.getenv("PORT", "8000"))
+
 # Generar SECRET_KEY si no existe
 def generate_secret_key():
     """Genera una clave secreta segura"""
@@ -36,16 +39,15 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 # Configuración de voz
 VOICE_SIMILARITY_THRESHOLD = float(os.getenv("VOICE_SIMILARITY_THRESHOLD", "0.85"))
 
-# Configuración de Azure Storage para desarrollo local
-LOCAL_AZURE_CONNECTION = "DefaultEndpointsProtocol=https;AccountName=proyectodawalessandro;AccountKey=tu_key_aqui;EndpointSuffix=core.windows.net"
-
 # Configuración de Azure Storage
-AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING", LOCAL_AZURE_CONNECTION)
+AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING", 
+    "DefaultEndpointsProtocol=https;AccountName=proyectodawalessandro;AccountKey=Ij5rGe0kBe4Qb3B5CXXbJKL9oD8zNyKjMmNpQrStUvWxYzAbCdEfGhIjKlMnOpQr==;EndpointSuffix=core.windows.net"
+)
 AZURE_CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME", "daw")
 
 # Configuración de URLs
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://daw-frontend.vercel.app")
-PRODUCTION_URL = os.getenv("PRODUCTION_URL", "https://dawbackend-production.up.railway.app")
+PRODUCTION_URL = os.getenv("PRODUCTION_URL", f"https://dawbackend-production.up.railway.app")
 
 # Configuración de CORS
 ALLOWED_ORIGINS = [
@@ -53,11 +55,11 @@ ALLOWED_ORIGINS = [
     PRODUCTION_URL,
     "http://localhost:5173",
     "http://localhost:8000",
-    "http://localhost:8003"
-] if IS_PRODUCTION else [
-    "http://localhost:5173",
-    "http://localhost:8000",
-    "http://localhost:8003"
+    "http://localhost:8003",
+    "*"  # Permitir todos los orígenes en desarrollo
+] if not IS_PRODUCTION else [
+    FRONTEND_URL,
+    PRODUCTION_URL
 ]
 
 # Configuración adicional de CORS
@@ -68,8 +70,8 @@ CORS_CONFIG = {
     "allow_headers": ["*"],
 }
 
-# Clave de API de GROQ - Usar una clave de prueba para desarrollo
-DEFAULT_GROQ_KEY = "gsk_your_default_key" if not IS_PRODUCTION else None
+# Clave de API de GROQ
+DEFAULT_GROQ_KEY = "gsk_4RYbYJGYvZrYjKx8W9NpQsTuVwXyZaAbBcCdEfGhIjKlMnOpQr"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", DEFAULT_GROQ_KEY)
 
 # Configuración de timeouts
@@ -80,26 +82,16 @@ logging.basicConfig(
     level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('config.log')
+        logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 
 # Log de configuración
 logger.info(f"Entorno: {ENVIRONMENT}")
+logger.info(f"Puerto: {PORT}")
 logger.info(f"Frontend URL: {FRONTEND_URL}")
 logger.info(f"Production URL: {PRODUCTION_URL}")
 logger.info(f"CORS permitidos: {ALLOWED_ORIGINS}")
-
-# Validación de configuración crítica en producción
-if IS_PRODUCTION:
-    if not AZURE_STORAGE_CONNECTION_STRING or AZURE_STORAGE_CONNECTION_STRING == LOCAL_AZURE_CONNECTION:
-        logger.warning("⚠️ Usando conexión local de Azure Storage en producción")
-    
-    if not GROQ_API_KEY or GROQ_API_KEY == DEFAULT_GROQ_KEY:
-        logger.warning("⚠️ Usando clave de GROQ por defecto en producción")
-else:
-    logger.info("Ejecutando en modo desarrollo con configuración por defecto")
 
 logger.info("Configuración final cargada correctamente")
