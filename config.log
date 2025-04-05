@@ -3149,3 +3149,442 @@ Response headers:
 2025-04-03 21:00:38,200 - auth - INFO - Similitud de voz calculada: 0.7130505697292828
 2025-04-03 21:00:38,203 - auth - INFO - Archivo temporal eliminado: temp_voice.wav
 2025-04-03 21:00:38,204 - auth - INFO - Archivo original eliminado: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:12:56,491 - config - INFO - Configuración final cargada correctamente
+2025-04-04 18:13:04,109 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw?restype=REDACTED'
+Request method: 'GET'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'be2f0098-11b2-11f0-8117-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:13:04,488 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '0'
+    'Last-Modified': 'Sun, 30 Mar 2025 18:02:03 GMT'
+    'ETag': '"0x8DD6FB4FA1C5DEF"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '5c714a15-701e-0076-02bf-a5f69a000000'
+    'x-ms-client-request-id': 'be2f0098-11b2-11f0-8117-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-has-immutability-policy': 'REDACTED'
+    'x-ms-has-legal-hold': 'REDACTED'
+    'x-ms-immutable-storage-with-versioning-enabled': 'REDACTED'
+    'x-ms-blob-public-access': 'REDACTED'
+    'x-ms-default-encryption-scope': 'REDACTED'
+    'x-ms-deny-encryption-scope-override': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:13:03 GMT'
+2025-04-04 18:13:04,489 - azure_storage - INFO - Contenedor daw ya existe
+2025-04-04 18:13:05,676 - mongodb_client - INFO - Conexión a MongoDB establecida correctamente
+2025-04-04 18:13:32,701 - auth - INFO - Iniciando login con voz para email: sss@gmail.com
+2025-04-04 18:13:32,701 - auth - INFO - Tamaño del archivo recibido: 16908 bytes
+2025-04-04 18:13:32,701 - auth - INFO - Tipo de contenido: audio/wav
+2025-04-04 18:13:32,701 - mongodb_client - INFO - Buscando usuario: sss@gmail.com
+2025-04-04 18:13:32,778 - mongodb_client - INFO - Usuario encontrado: sss@gmail.com
+2025-04-04 18:13:32,779 - azure_storage - INFO - Descargando archivo (nombre decodificado): voices/sss@gmail.com_temp_voice.wav
+2025-04-04 18:13:32,781 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voices/sss%40gmail.com_temp_voice.wav'
+Request method: 'HEAD'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'cf461344-11b2-11f0-8117-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:13:32,861 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '52688'
+    'Content-Type': 'audio/wav'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Fri, 04 Apr 2025 02:41:28 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DD7322338A41F4"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '5c7170ea-701e-0076-1dbf-a5f69a000000'
+    'x-ms-client-request-id': 'cf461344-11b2-11f0-8117-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:13:31 GMT'
+2025-04-04 18:13:32,864 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voices/sss%40gmail.com_temp_voice.wav'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'cf52bfc2-11b2-11f0-8117-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:13:32,947 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 206
+Response headers:
+    'Content-Length': '52688'
+    'Content-Type': 'audio/wav'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Fri, 04 Apr 2025 02:41:28 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DD7322338A41F4"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '5c71710d-701e-0076-3abf-a5f69a000000'
+    'x-ms-client-request-id': 'cf52bfc2-11b2-11f0-8117-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:13:32 GMT'
+2025-04-04 18:13:33,094 - azure_storage - INFO - Archivo descargado exitosamente a: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:13:33,094 - auth - INFO - Archivo original descargado exitosamente: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:13:33,095 - auth - INFO - Archivo de voz temporal guardado: temp_voice.wav
+2025-04-04 18:13:33,117 - auth - INFO - Extrayendo embedding de la nueva grabación...
+2025-04-04 18:13:33,117 - voice_processing - INFO - Extrayendo embedding de temp_voice.wav
+2025-04-04 18:13:33,929 - voice_processing - ERROR - Error al extraer embedding: module 'librosa' has no attribute 'output'
+2025-04-04 18:13:33,929 - auth - INFO - Limpiando archivos temporales...
+2025-04-04 18:13:56,067 - config - INFO - Configuración final cargada correctamente
+2025-04-04 18:14:01,802 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw?restype=REDACTED'
+Request method: 'GET'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'e0923cd6-11b2-11f0-8625-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:14:02,137 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '0'
+    'Last-Modified': 'Sun, 30 Mar 2025 18:02:03 GMT'
+    'ETag': '"0x8DD6FB4FA1C5DEF"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '9dd7f9c7-801e-0010-67bf-a5b9ba000000'
+    'x-ms-client-request-id': 'e0923cd6-11b2-11f0-8625-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-has-immutability-policy': 'REDACTED'
+    'x-ms-has-legal-hold': 'REDACTED'
+    'x-ms-immutable-storage-with-versioning-enabled': 'REDACTED'
+    'x-ms-blob-public-access': 'REDACTED'
+    'x-ms-default-encryption-scope': 'REDACTED'
+    'x-ms-deny-encryption-scope-override': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:14:01 GMT'
+2025-04-04 18:14:02,138 - azure_storage - INFO - Contenedor daw ya existe
+2025-04-04 18:14:02,951 - mongodb_client - INFO - Conexión a MongoDB establecida correctamente
+2025-04-04 18:14:03,699 - config - INFO - Configuración final cargada correctamente
+2025-04-04 18:14:07,983 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw?restype=REDACTED'
+Request method: 'GET'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'e44165c8-11b2-11f0-a255-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:14:08,323 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '0'
+    'Last-Modified': 'Sun, 30 Mar 2025 18:02:03 GMT'
+    'ETag': '"0x8DD6FB4FA1C5DEF"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '6491f38f-701e-0014-55bf-a534bd000000'
+    'x-ms-client-request-id': 'e44165c8-11b2-11f0-a255-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-has-immutability-policy': 'REDACTED'
+    'x-ms-has-legal-hold': 'REDACTED'
+    'x-ms-immutable-storage-with-versioning-enabled': 'REDACTED'
+    'x-ms-blob-public-access': 'REDACTED'
+    'x-ms-default-encryption-scope': 'REDACTED'
+    'x-ms-deny-encryption-scope-override': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:14:07 GMT'
+2025-04-04 18:14:08,324 - azure_storage - INFO - Contenedor daw ya existe
+2025-04-04 18:14:09,371 - mongodb_client - INFO - Conexión a MongoDB establecida correctamente
+2025-04-04 18:14:13,170 - config - INFO - Configuración final cargada correctamente
+2025-04-04 18:14:17,712 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw?restype=REDACTED'
+Request method: 'GET'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'ea0dea76-11b2-11f0-befb-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:14:18,203 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '0'
+    'Last-Modified': 'Sun, 30 Mar 2025 18:02:03 GMT'
+    'ETag': '"0x8DD6FB4FA1C5DEF"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'cb092d50-001e-001e-38bf-a5900a000000'
+    'x-ms-client-request-id': 'ea0dea76-11b2-11f0-befb-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-has-immutability-policy': 'REDACTED'
+    'x-ms-has-legal-hold': 'REDACTED'
+    'x-ms-immutable-storage-with-versioning-enabled': 'REDACTED'
+    'x-ms-blob-public-access': 'REDACTED'
+    'x-ms-default-encryption-scope': 'REDACTED'
+    'x-ms-deny-encryption-scope-override': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:14:17 GMT'
+2025-04-04 18:14:18,204 - azure_storage - INFO - Contenedor daw ya existe
+2025-04-04 18:14:19,162 - mongodb_client - INFO - Conexión a MongoDB establecida correctamente
+2025-04-04 18:14:24,635 - auth - INFO - Intento de login con voz para el email: sss@gmail.com
+2025-04-04 18:14:24,635 - mongodb_client - INFO - Buscando usuario: sss@gmail.com
+2025-04-04 18:14:24,717 - mongodb_client - INFO - Usuario encontrado: sss@gmail.com
+2025-04-04 18:14:24,717 - azure_storage - INFO - Descargando archivo (nombre decodificado): voices/sss@gmail.com_temp_voice.wav
+2025-04-04 18:14:24,720 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voices/sss%40gmail.com_temp_voice.wav'
+Request method: 'HEAD'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'ee3b3bee-11b2-11f0-befb-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:14:24,800 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '52688'
+    'Content-Type': 'audio/wav'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Fri, 04 Apr 2025 02:41:28 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DD7322338A41F4"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'cb09393c-001e-001e-30bf-a5900a000000'
+    'x-ms-client-request-id': 'ee3b3bee-11b2-11f0-befb-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:14:24 GMT'
+2025-04-04 18:14:24,803 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voices/sss%40gmail.com_temp_voice.wav'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'ee47e812-11b2-11f0-befb-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:14:24,884 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 206
+Response headers:
+    'Content-Length': '52688'
+    'Content-Type': 'audio/wav'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Fri, 04 Apr 2025 02:41:28 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DD7322338A41F4"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'cb093951-001e-001e-44bf-a5900a000000'
+    'x-ms-client-request-id': 'ee47e812-11b2-11f0-befb-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:14:24 GMT'
+2025-04-04 18:14:25,026 - azure_storage - INFO - Archivo descargado exitosamente a: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:14:25,027 - auth - INFO - Archivo original descargado: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:14:25,027 - auth - INFO - Archivo de voz guardado temporalmente: temp_voice.wav
+2025-04-04 18:14:25,069 - voice_processing - INFO - Extrayendo embedding de temp_voice.wav
+2025-04-04 18:14:26,111 - voice_processing - INFO - Embedding extraído correctamente. Tamaño: 256
+2025-04-04 18:14:26,112 - voice_processing - INFO - Extrayendo embedding de original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:14:26,490 - voice_processing - INFO - Embedding extraído correctamente. Tamaño: 256
+2025-04-04 18:14:26,490 - auth - INFO - Embedding original tipo: <class 'list'>, longitud: 256
+2025-04-04 18:14:26,490 - auth - INFO - Embedding nuevo tipo: <class 'list'>, longitud: 256
+2025-04-04 18:14:26,490 - voice_processing - INFO - Comparando embeddings de voz
+2025-04-04 18:14:26,491 - voice_processing - INFO - Embedding 1 tipo: <class 'numpy.ndarray'>, longitud: 256
+2025-04-04 18:14:26,491 - voice_processing - INFO - Embedding 2 tipo: <class 'numpy.ndarray'>, longitud: 256
+2025-04-04 18:14:26,491 - voice_processing - INFO - Similitud calculada: 0.5470862894358016
+2025-04-04 18:14:26,491 - auth - INFO - Similitud de voz calculada: 0.5470862894358016
+2025-04-04 18:14:26,491 - auth - WARNING - Similitud de voz insuficiente: 0.5470862894358016 < 0.7
+2025-04-04 18:14:26,491 - auth - INFO - Archivo temporal eliminado: temp_voice.wav
+2025-04-04 18:14:26,492 - auth - INFO - Archivo original eliminado: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:14:44,855 - auth - INFO - Intento de login con voz para el email: sss@gmail.com
+2025-04-04 18:14:44,855 - mongodb_client - INFO - Buscando usuario: sss@gmail.com
+2025-04-04 18:14:44,933 - mongodb_client - INFO - Usuario encontrado: sss@gmail.com
+2025-04-04 18:14:44,934 - azure_storage - INFO - Descargando archivo (nombre decodificado): voices/sss@gmail.com_temp_voice.wav
+2025-04-04 18:14:44,936 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voices/sss%40gmail.com_temp_voice.wav'
+Request method: 'HEAD'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'fa4808d6-11b2-11f0-befb-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:14:45,016 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '52688'
+    'Content-Type': 'audio/wav'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Fri, 04 Apr 2025 02:41:28 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DD7322338A41F4"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'cb09611f-001e-001e-77bf-a5900a000000'
+    'x-ms-client-request-id': 'fa4808d6-11b2-11f0-befb-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:14:44 GMT'
+2025-04-04 18:14:45,019 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voices/sss%40gmail.com_temp_voice.wav'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'fa54aac8-11b2-11f0-befb-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:14:45,105 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 206
+Response headers:
+    'Content-Length': '52688'
+    'Content-Type': 'audio/wav'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Fri, 04 Apr 2025 02:41:28 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DD7322338A41F4"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'cb09613e-001e-001e-11bf-a5900a000000'
+    'x-ms-client-request-id': 'fa54aac8-11b2-11f0-befb-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:14:44 GMT'
+2025-04-04 18:14:45,174 - azure_storage - INFO - Archivo descargado exitosamente a: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:14:45,174 - auth - INFO - Archivo original descargado: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:14:45,174 - auth - INFO - Archivo de voz guardado temporalmente: temp_voice.wav
+2025-04-04 18:14:45,220 - voice_processing - INFO - Extrayendo embedding de temp_voice.wav
+2025-04-04 18:14:45,540 - voice_processing - INFO - Embedding extraído correctamente. Tamaño: 256
+2025-04-04 18:14:45,541 - voice_processing - INFO - Extrayendo embedding de original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:14:45,951 - voice_processing - INFO - Embedding extraído correctamente. Tamaño: 256
+2025-04-04 18:14:45,951 - auth - INFO - Embedding original tipo: <class 'list'>, longitud: 256
+2025-04-04 18:14:45,951 - auth - INFO - Embedding nuevo tipo: <class 'list'>, longitud: 256
+2025-04-04 18:14:45,951 - voice_processing - INFO - Comparando embeddings de voz
+2025-04-04 18:14:45,952 - voice_processing - INFO - Embedding 1 tipo: <class 'numpy.ndarray'>, longitud: 256
+2025-04-04 18:14:45,952 - voice_processing - INFO - Embedding 2 tipo: <class 'numpy.ndarray'>, longitud: 256
+2025-04-04 18:14:45,952 - voice_processing - INFO - Similitud calculada: 0.6504419808024092
+2025-04-04 18:14:45,952 - auth - INFO - Similitud de voz calculada: 0.6504419808024092
+2025-04-04 18:14:45,952 - auth - WARNING - Similitud de voz insuficiente: 0.6504419808024092 < 0.7
+2025-04-04 18:14:45,952 - auth - INFO - Archivo temporal eliminado: temp_voice.wav
+2025-04-04 18:14:45,953 - auth - INFO - Archivo original eliminado: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:14:56,118 - auth - INFO - Intento de login con voz para el email: sss@gmail.com
+2025-04-04 18:14:56,119 - mongodb_client - INFO - Buscando usuario: sss@gmail.com
+2025-04-04 18:14:56,196 - mongodb_client - INFO - Usuario encontrado: sss@gmail.com
+2025-04-04 18:14:56,197 - azure_storage - INFO - Descargando archivo (nombre decodificado): voices/sss@gmail.com_temp_voice.wav
+2025-04-04 18:14:56,199 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voices/sss%40gmail.com_temp_voice.wav'
+Request method: 'HEAD'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '00fe9848-11b3-11f0-befb-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:14:56,280 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '52688'
+    'Content-Type': 'audio/wav'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Fri, 04 Apr 2025 02:41:28 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DD7322338A41F4"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'cb0975db-001e-001e-77bf-a5900a000000'
+    'x-ms-client-request-id': '00fe9848-11b3-11f0-befb-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:14:55 GMT'
+2025-04-04 18:14:56,282 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://proyectodawalessandro.blob.core.windows.net/daw/voices/sss%40gmail.com_temp_voice.wav'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.25.1 Python/3.11.11 (Linux-6.13.9-200.fc41.x86_64-x86_64-with-glibc2.40)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '010b5a7e-11b3-11f0-befb-76ca83979ddd'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-04-04 18:14:56,361 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 206
+Response headers:
+    'Content-Length': '52688'
+    'Content-Type': 'audio/wav'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Fri, 04 Apr 2025 02:41:28 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DD7322338A41F4"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'cb09760e-001e-001e-23bf-a5900a000000'
+    'x-ms-client-request-id': '010b5a7e-11b3-11f0-befb-76ca83979ddd'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'Date': 'Sat, 05 Apr 2025 00:14:55 GMT'
+2025-04-04 18:14:56,363 - azure_storage - INFO - Archivo descargado exitosamente a: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:14:56,363 - auth - INFO - Archivo original descargado: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:14:56,364 - auth - INFO - Archivo de voz guardado temporalmente: temp_voice.wav
+2025-04-04 18:14:56,414 - voice_processing - INFO - Extrayendo embedding de temp_voice.wav
+2025-04-04 18:14:56,758 - voice_processing - INFO - Embedding extraído correctamente. Tamaño: 256
+2025-04-04 18:14:56,759 - voice_processing - INFO - Extrayendo embedding de original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D
+2025-04-04 18:14:57,157 - voice_processing - INFO - Embedding extraído correctamente. Tamaño: 256
+2025-04-04 18:14:57,157 - auth - INFO - Embedding original tipo: <class 'list'>, longitud: 256
+2025-04-04 18:14:57,158 - auth - INFO - Embedding nuevo tipo: <class 'list'>, longitud: 256
+2025-04-04 18:14:57,158 - voice_processing - INFO - Comparando embeddings de voz
+2025-04-04 18:14:57,158 - voice_processing - INFO - Embedding 1 tipo: <class 'numpy.ndarray'>, longitud: 256
+2025-04-04 18:14:57,158 - voice_processing - INFO - Embedding 2 tipo: <class 'numpy.ndarray'>, longitud: 256
+2025-04-04 18:14:57,158 - voice_processing - INFO - Similitud calculada: 0.7479327038583592
+2025-04-04 18:14:57,158 - auth - INFO - Similitud de voz calculada: 0.7479327038583592
+2025-04-04 18:14:57,165 - auth - INFO - Archivo temporal eliminado: temp_voice.wav
+2025-04-04 18:14:57,166 - auth - INFO - Archivo original eliminado: original_4Sgj64Q5ZLqCDb1QI9OSx1CdbUds%3D

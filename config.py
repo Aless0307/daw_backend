@@ -31,10 +31,7 @@ AZURE_CONTAINER_NAME = "daw"
 # Configuración de CORS
 ALLOWED_ORIGINS = [
     "https://daw-frontend.vercel.app",
-    "http://localhost:5173",
-    "https://vercel.live",
-    "https://*.vercel.live",
-    "https://*.vercel.app"
+    "http://localhost:5173"
 ]
 
 # Configuración de URLs
