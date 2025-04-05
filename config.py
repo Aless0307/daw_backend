@@ -45,9 +45,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 VOICE_SIMILARITY_THRESHOLD = float(os.getenv("VOICE_SIMILARITY_THRESHOLD", "0.85"))
 
 # Configuración de Azure Storage
-AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING", 
-    "DefaultEndpointsProtocol=https;AccountName=proyectodawalessandro;AccountKey=+5u3MzkDsZRqx84xI+RzFiZxz6LT0wAK1WYfGB3UrOc3AcRFVLqErikBH7KyWauwpSsVYMXPveXI+AStTv5FmA==;EndpointSuffix=core.windows.net"
-)
+AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
 AZURE_CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME", "daw")
 
 # Configuración de URLs
