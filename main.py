@@ -20,6 +20,9 @@ from voice_processing import router as voice_router
 from groq import router as groq_router
 from azure_storage import get_azure_status, verify_azure_storage, reset_connection
 
+# Configurar logger
+logger = logging.getLogger(__name__)
+
 # Configurar logging
 logging.basicConfig(
     level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
@@ -28,7 +31,6 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger(__name__)
 
 # Log del entorno actual
 logger.info(f"Iniciando aplicación en entorno: {ENVIRONMENT}")
@@ -52,17 +54,33 @@ async def health_check():
     Ruta de healthcheck para Railway.
     Siempre devuelve 200 OK, pero incluye el estado de los servicios.
     """
-    services_status = {
-        "azure_storage": get_azure_status(),
-        "groq_api": {"available": bool(GROQ_API_KEY)}
-    }
-    
-    return {
-        "status": "healthy",
-        "environment": ENVIRONMENT,
-        "timestamp": time.time(),
-        "services": services_status
-    }
+    try:
+        # Intentar comprobar servicios básicos sin fallar
+        try:
+            azure_status = get_azure_status()
+        except Exception as e:
+            logger.warning(f"Error al verificar Azure Storage en healthcheck: {str(e)}")
+            azure_status = {"error": str(e)}
+            
+        services_status = {
+            "azure_storage": azure_status,
+            "groq_api": {"available": bool(GROQ_API_KEY)}
+        }
+        
+        return {
+            "status": "healthy",
+            "environment": ENVIRONMENT,
+            "timestamp": time.time(),
+            "services": services_status
+        }
+    except Exception as e:
+        # En caso de cualquier error, aún retornamos 200 OK
+        logger.error(f"Error en healthcheck: {str(e)}")
+        return {
+            "status": "healthy",  # Decimos que es healthy para que Railway no reinicie
+            "warning": "Servicio parcialmente disponible",
+            "timestamp": time.time()
+        }
 
 @app.get("/")
 async def root():

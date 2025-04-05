@@ -7,7 +7,11 @@ pydantic==2.6.1
 pymongo==4.6.1
 python-dotenv==1.0.1
 azure-storage-blob==12.19.0
-numpy==1.26.4
+numpy==1.24.3
 librosa==0.10.1
-resemblyzer==0.1.4
-scipy==1.12.0 
+scipy==1.11.3
+torch==2.0.1
+soundfile==0.12.1
+pydub==0.25.1
+noisereduce==2.0.1
+resemblyzer==0.1.4 

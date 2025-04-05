@@ -37,9 +37,14 @@ logger.info(f"Ejecutando en entorno: {ENVIRONMENT}")
 try:
     from resemblyzer import preprocess_wav, VoiceEncoder
     RESEMBLYZER_AVAILABLE = True
-except ImportError:
-    logger.error("❌ La biblioteca resemblyzer no está instalada. La funcionalidad de voz estará limitada.")
+    logger.info("✅ La biblioteca resemblyzer se ha importado correctamente")
+except ImportError as e:
+    logger.error(f"❌ La biblioteca resemblyzer no está instalada: {str(e)}")
     logger.error("❌ Para instalar: pip install resemblyzer==0.1.0")
+    RESEMBLYZER_AVAILABLE = False
+except Exception as e:
+    logger.error(f"❌ Error al importar resemblyzer: {str(e)}")
+    logger.error(traceback.format_exc())
     RESEMBLYZER_AVAILABLE = False
 
 router = APIRouter()
@@ -97,21 +102,33 @@ if RESEMBLYZER_AVAILABLE:
     try:
         logger.info("🚀 Precargando modelo de codificación de voz...")
         
-        # Verificar que resemblyzer está instalado
+        # Verificar dependencias adicionales
         try:
+            import torch
+            logger.info(f"✅ PyTorch versión: {torch.__version__}")
+            
             import pkg_resources
-            pkg_resources.get_distribution("resemblyzer")
-        except pkg_resources.DistributionNotFound:
-            logger.error("❌ La biblioteca resemblyzer no está instalada. Ejecute: pip install resemblyzer==0.1.0")
-            logger.error("❌ Es posible que necesite instalar dependencias adicionales: pip install librosa numpy torch==1.13.0")
+            resemblyzer_version = pkg_resources.get_distribution("resemblyzer").version
+            logger.info(f"✅ Resemblyzer versión: {resemblyzer_version}")
+            
+            import librosa
+            logger.info(f"✅ Librosa versión: {librosa.__version__}")
+            
+            import soundfile
+            logger.info(f"✅ SoundFile disponible")
+        except Exception as dep_err:
+            logger.warning(f"⚠️ Problema con dependencias: {str(dep_err)}")
         
         # Intentar cargar el modelo
         encoder = get_voice_encoder()
         if encoder is None:
             logger.error("❌ No se pudo inicializar el modelo de voz. Verificar los logs para más detalles.")
+        else:
+            logger.info("✅ Modelo de voz inicializado correctamente")
     except Exception as e:
         logger.error(f"❌ Error al precargar el modelo de voz: {str(e)}")
         logger.error(traceback.format_exc())
+        RESEMBLYZER_AVAILABLE = False  # Desactivar si falló la inicialización
 else:
     logger.warning("⚠️ Resemblyzer no está disponible, no se precargará el modelo de voz")
 
@@ -180,12 +197,15 @@ def extract_embedding(audio_path: str) -> np.ndarray:
     """
     Extrae el embedding de voz de un archivo de audio usando VoiceEncoder.
     
-    Si resemblyzer no está disponible, retorna None.
+    Si resemblyzer no está disponible, retorna None y genera un HTTPException.
     """
     # Verificar si resemblyzer está disponible
     if not RESEMBLYZER_AVAILABLE:
         logger.warning("⚠️ No se puede extraer embedding: resemblyzer no está disponible")
-        return None
+        raise HTTPException(
+            status_code=503,
+            detail="El servicio de procesamiento de voz no está disponible temporalmente. Por favor, intente más tarde."
+        )
         
     try:
         logger.info(f"Extrayendo embedding de {audio_path}")
@@ -194,58 +214,64 @@ def extract_embedding(audio_path: str) -> np.ndarray:
         # Verificar que el archivo existe y no está vacío
         if not os.path.exists(audio_path):
             logger.error(f"El archivo {audio_path} no existe")
-            return None
+            raise HTTPException(status_code=400, detail="El archivo de audio no existe")
             
         if os.path.getsize(audio_path) == 0:
             logger.error(f"El archivo {audio_path} está vacío")
-            return None
+            raise HTTPException(status_code=400, detail="El archivo de audio está vacío")
             
         # Verificar tamaño máximo (15MB)
         max_size = 15 * 1024 * 1024  # 15MB
         if os.path.getsize(audio_path) > max_size:
             logger.error(f"El archivo {audio_path} es demasiado grande: {os.path.getsize(audio_path)} bytes")
-            return None
-        
+            raise HTTPException(status_code=400, detail="El archivo de audio excede el tamaño máximo permitido (15MB)")
+         
         # Preprocesar el audio para mejorar calidad
         if not preprocess_audio(audio_path):
             logger.warning("⚠️ No se pudo preprocesar el audio, usando audio original")
-            
-        # Verificar duración máxima (10 segundos)
-        audio, sr = librosa.load(audio_path, sr=None)
-        duration = len(audio) / sr
-        if duration > 10:
-            logger.warning(f"⚠️ Audio demasiado largo: {duration:.2f}s > 10s, se truncará")
-            audio = audio[:int(10 * sr)]
-            # Guardar audio truncado
-            sf.write(audio_path, audio, sr)
-        elif duration < 1.5:
-            logger.warning(f"⚠️ Audio demasiado corto: {duration:.2f}s < 1.5s")
-            return None
-
-        # Verificar que resemblyzer está instalado
+          
+        # Verificar formato y duración
         try:
-            from resemblyzer import preprocess_wav
-        except ImportError:
-            logger.error("❌ La biblioteca resemblyzer no está instalada")
-            return None
+            y, sr = librosa.load(audio_path, sr=None)
+            duration = librosa.get_duration(y=y, sr=sr)
+            logger.info(f"Duración del audio: {duration:.2f}s, Tasa de muestreo: {sr}Hz")
             
+            # Verificar duración máxima (10 segundos)
+            if duration > 10:
+                logger.warning(f"⚠️ Audio demasiado largo: {duration:.2f}s > 10s, se truncará")
+                audio = y[:int(10 * sr)]
+                # Guardar audio truncado
+                sf.write(audio_path, audio, sr)
+            elif duration < 1.0:
+                logger.warning(f"⚠️ Audio muy corto: {duration:.2f}s")
+                raise HTTPException(status_code=400, detail="El audio es demasiado corto para procesarlo correctamente")
+        except Exception as e:
+            logger.error(f"Error al verificar el audio: {str(e)}")
+            raise HTTPException(status_code=400, detail="El archivo de audio no es válido o está corrupto")
+        
         try:
             # Cargar y preprocesar el audio usando resemblyzer
             wav = preprocess_wav(audio_path)
         except Exception as e:
             logger.error(f"❌ Error al preprocesar el audio con resemblyzer: {str(e)}")
-            return None
+            raise HTTPException(
+                status_code=400, 
+                detail="No se pudo procesar el audio. Asegúrese de que sea un archivo WAV válido."
+            )
         
         # Verificar que el audio no está vacío
         if len(wav) == 0:
             logger.error("No se pudo cargar el audio o el audio está vacío")
-            return None
+            raise HTTPException(status_code=400, detail="El archivo de audio está vacío después del preprocesamiento")
             
         # Obtener el codificador
         encoder = get_voice_encoder()
         if encoder is None:
             logger.error("No se pudo obtener el codificador de voz")
-            return None
+            raise HTTPException(
+                status_code=503,
+                detail="El servicio de procesamiento de voz no está disponible temporalmente. Por favor, intente más tarde."
+            )
             
         # Extraer embedding usando resemblyzer
         try:
