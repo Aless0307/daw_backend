@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import time
 import logging
+import os
 from config import (
     ALLOWED_ORIGINS,
     PRODUCTION_URL,
@@ -16,7 +17,9 @@ from config import (
 from auth import router as auth_router
 from voice_processing import router as voice_router
 from groq import router as groq_router
-import os
+
+# Obtener el puerto de la variable de entorno
+PORT = int(os.getenv("PORT", "8000"))
 
 # Configurar logging
 logging.basicConfig(
@@ -31,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Log del entorno actual
 logger.info(f"Iniciando aplicación en entorno: {ENVIRONMENT}")
+logger.info(f"Puerto configurado: {PORT}")
 logger.info(f"CORS permitidos: {ALLOWED_ORIGINS}")
 
 app = FastAPI()
@@ -72,7 +76,8 @@ async def root():
     return {
         "message": "API de DAW funcionando correctamente",
         "environment": ENVIRONMENT,
-        "is_production": IS_PRODUCTION
+        "is_production": IS_PRODUCTION,
+        "port": PORT
     }
 
 # Incluir routers
@@ -82,6 +87,5 @@ app.include_router(groq_router, prefix="/groq", tags=["groq"])
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=not IS_PRODUCTION)
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
 
