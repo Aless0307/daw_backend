@@ -7,8 +7,9 @@ WORKDIR /app
 # Establece variables de entorno
 ENV PYTHONUNBUFFERED=1
 ENV RAILWAY_ENVIRONMENT=production
+ENV PORT=8000
 
-# Instala las dependencias del sistema necesarias para compilar webrtcvad
+# Instala las dependencias del sistema necesarias
 RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
@@ -24,9 +25,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copia el código fuente al contenedor
 COPY . .
 
-# Expone el puerto que Railway asignará
-ENV PORT=8000
-EXPOSE 8000
+# Expone el puerto
+EXPOSE ${PORT}
+
+# Script de inicio
+RUN echo '#!/bin/bash\n\
+uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 75' > /app/start.sh && \
+    chmod +x /app/start.sh
 
 # Configura el comando de inicio
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT --workers 4
+CMD ["/app/start.sh"]

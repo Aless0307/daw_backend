@@ -1,10 +1,17 @@
 [build]
-builder = "NIXPACKS"
-buildCommand = "pip install -r requirements.txt"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
-healthcheckPath = "/"
+startCommand = "/app/start.sh"
+healthcheckPath = "/health"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3 
+restartPolicyMaxRetries = 3
+
+[deploy.healthcheck]
+path = "/health"
+interval = "30s"
+timeout = "10s"
+retries = 3
+initialDelay = "15s" 
