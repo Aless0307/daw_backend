@@ -47,7 +47,7 @@ class MongoDBClient:
     def get_collection(self, collection_name):
         return self._db[collection_name]
 
-    def create_user(self, username: str, email: str, password: str, voice_embedding: list = None, voice_url: str = None) -> bool:
+    def create_user(self, username: str, email: str, password: str, voice_embedding: list = None, voice_url: str = None, voice_embeddings: list = None) -> bool:
         """
         Crea un nuevo usuario en la base de datos
         
@@ -55,8 +55,9 @@ class MongoDBClient:
             username: Nombre del usuario
             email: Email del usuario
             password: Contraseña hasheada
-            voice_embedding: Embedding de voz (opcional)
+            voice_embedding: Embedding de voz individual (opcional)
             voice_url: URL del archivo de voz (opcional)
+            voice_embeddings: Lista de embeddings de voz (opcional)
             
         Returns:
             bool: True si el usuario fue creado exitosamente
@@ -79,6 +80,8 @@ class MongoDBClient:
             # Agregar datos opcionales si existen
             if voice_embedding is not None:
                 user_data["voice_embedding"] = voice_embedding
+            if voice_embeddings is not None:
+                user_data["voice_embeddings"] = voice_embeddings
             if voice_url is not None:
                 user_data["voice_url"] = voice_url
             
@@ -207,21 +210,116 @@ class MongoDBClient:
             
             logger.info("Buscando usuario por voz")
             
-            # Obtener todos los usuarios con embedding de voz
-            users = self._db.users.find({"voice_embedding": {"$exists": True}})
+            # Obtener todos los usuarios con embedding de voz (antiguo o nuevo formato)
+            users = list(self._db.users.find({
+                "$or": [
+                    {"voice_embedding": {"$exists": True}},
+                    {"voice_embeddings": {"$exists": True}}
+                ]
+            }))
+            
+            best_match = None
+            best_similarity = 0
             
             # Comparar con cada usuario
             for user in users:
-                user_embedding = user["voice_embedding"]
-                similarity = compare_voices(user_embedding, voice_embedding)
+                max_similarity = 0
                 
-                if similarity >= VOICE_SIMILARITY_THRESHOLD:
-                    logger.info(f"Usuario encontrado por voz: {user['email']}")
-                    return user
+                # Verificar embeddings individuales si existen
+                if "voice_embedding" in user:
+                    user_embedding = user["voice_embedding"]
+                    result = compare_voices(user_embedding, voice_embedding)
+                    similarity = result.get("similarity", 0)
+                    max_similarity = max(max_similarity, similarity)
+                
+                # Verificar galería de embeddings si existe
+                if "voice_embeddings" in user and isinstance(user["voice_embeddings"], list):
+                    for stored_embedding in user["voice_embeddings"]:
+                        result = compare_voices(stored_embedding, voice_embedding)
+                        similarity = result.get("similarity", 0)
+                        max_similarity = max(max_similarity, similarity)
+                
+                # Actualizar mejor coincidencia si es necesario
+                if max_similarity > best_similarity:
+                    best_similarity = max_similarity
+                    best_match = user
+            
+            # Verificar si la mejor coincidencia supera el umbral
+            if best_match and best_similarity >= VOICE_SIMILARITY_THRESHOLD:
+                logger.info(f"Usuario encontrado por voz: {best_match['email']} (similitud: {best_similarity:.4f})")
+                return best_match
             
             logger.info("No se encontró usuario con esa voz")
             return None
             
         except Exception as e:
             logger.error(f"Error al buscar usuario por voz: {str(e)}")
-            raise 
+            raise
+
+    def update_user_voice_gallery(self, email: str, voice_embeddings: list, voice_url: str = None) -> bool:
+        """
+        Actualiza la galería de embeddings de voz de un usuario
+        
+        Args:
+            email: Email del usuario
+            voice_embeddings: Lista de embeddings de voz
+            voice_url: Nueva URL del archivo de voz (opcional)
+            
+        Returns:
+            bool: True si la actualización fue exitosa
+        """
+        try:
+            logger.info(f"Actualizando galería de embeddings de voz para: {email}")
+            
+            # Preparar datos de actualización
+            update_data = {
+                "voice_embeddings": voice_embeddings
+            }
+            if voice_url is not None:
+                update_data["voice_url"] = voice_url
+            
+            # Actualizar en la base de datos
+            result = self._db.users.update_one(
+                {"email": email},
+                {"$set": update_data}
+            )
+            
+            if result.modified_count > 0:
+                logger.info(f"Galería de voz actualizada para: {email} con {len(voice_embeddings)} embeddings")
+                return True
+            else:
+                logger.warning(f"No se actualizó la galería de voz para: {email}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error al actualizar galería de voz para {email}: {str(e)}")
+            return False
+
+    def get_user_voice_data(self, email: str) -> dict:
+        """
+        Obtiene los datos de voz de un usuario
+        
+        Args:
+            email: Email del usuario
+            
+        Returns:
+            dict: Datos de voz del usuario (embeddings y URL) o None si no existen
+        """
+        try:
+            logger.info(f"Obteniendo datos de voz para: {email}")
+            
+            # Buscar usuario
+            user = self._db.users.find_one(
+                {"email": email},
+                {"voice_embedding": 1, "voice_embeddings": 1, "voice_url": 1, "_id": 0}
+            )
+            
+            if not user:
+                logger.warning(f"Usuario no encontrado: {email}")
+                return None
+                
+            return user
+                
+        except Exception as e:
+            logger.error(f"Error al obtener datos de voz para {email}: {str(e)}")
+            return None 
