@@ -65,72 +65,106 @@ def get_voice_encoder():
     
     # Si resemblyzer no está disponible, no intentar inicializar
     if not RESEMBLYZER_AVAILABLE:
-        logger.warning("⚠️ Resemblyzer no está disponible, no se puede inicializar el codificador")
+        logger.error("❌ Resemblyzer no está disponible, no se puede inicializar el codificador")
         return None
         
     if voice_encoder is None:
         start_time = time.time()
-        logger.info("🔄 Inicializando modelo de codificación de voz...")
+        logger.error(f"⚠️ Modelo no inicializado, cargando por primera vez en {ENVIRONMENT}...")
         try:
             # Intentar obtener la versión de resemblyzer
             try:
                 import pkg_resources
                 resemblyzer_version = pkg_resources.get_distribution("resemblyzer").version
-                logger.info(f"📦 Versión de resemblyzer: {resemblyzer_version}")
+                logger.error(f"📦 Versión de resemblyzer: {resemblyzer_version}")
             except Exception as ve:
-                logger.warning(f"⚠️ No se pudo determinar la versión de resemblyzer: {str(ve)}")
+                logger.error(f"⚠️ No se pudo determinar la versión de resemblyzer: {str(ve)}")
                 
             # Inicializar el codificador
+            logger.error("🔄 Comenzando inicialización del modelo de voz...")
             voice_encoder = VoiceEncoder()
+            
+            # Verificar que el modelo realmente esté cargado haciendo una operación pequeña
+            dummy_audio = np.zeros(16000)  # 1 segundo de silencio a 16kHz
+            _ = voice_encoder.embed_utterance(dummy_audio)
+            
             load_time = time.time() - start_time
-            logger.info(f"✅ Modelo de voz cargado en {load_time:.2f} segundos")
+            logger.error(f"✅ Modelo de voz cargado y verificado en {load_time:.2f} segundos")
             
             # Verificar si tiene el método segment_utterance
             if hasattr(voice_encoder, 'segment_utterance'):
-                logger.info("✅ Método segment_utterance disponible")
+                logger.error("✅ Método segment_utterance disponible")
             else:
-                logger.warning("⚠️ Método segment_utterance no disponible, se usará embed_utterance directamente")
+                logger.error("⚠️ Método segment_utterance no disponible, se usará embed_utterance directamente")
                 
         except Exception as e:
             logger.error(f"❌ Error al cargar el modelo de voz: {str(e)}")
             logger.error(traceback.format_exc())
             return None
+    else:
+        logger.info("✅ Usando modelo ya cargado en memoria")
+    
     return voice_encoder
 
 # Inicializar el modelo de voz al arrancar
 if RESEMBLYZER_AVAILABLE:
     try:
-        logger.info("🚀 Precargando modelo de codificación de voz...")
+        logger.error("🚀 Precargando modelo de codificación de voz...")
         
         # Verificar dependencias adicionales
         try:
             import torch
-            logger.info(f"✅ PyTorch versión: {torch.__version__}")
+            logger.error(f"✅ PyTorch versión: {torch.__version__}")
             
             import pkg_resources
             resemblyzer_version = pkg_resources.get_distribution("resemblyzer").version
-            logger.info(f"✅ Resemblyzer versión: {resemblyzer_version}")
+            logger.error(f"✅ Resemblyzer versión: {resemblyzer_version}")
             
             import librosa
-            logger.info(f"✅ Librosa versión: {librosa.__version__}")
+            logger.error(f"✅ Librosa versión: {librosa.__version__}")
             
             import soundfile
-            logger.info(f"✅ SoundFile disponible")
+            logger.error(f"✅ SoundFile disponible")
         except Exception as dep_err:
-            logger.warning(f"⚠️ Problema con dependencias: {str(dep_err)}")
+            logger.error(f"⚠️ Problema con dependencias: {str(dep_err)}")
         
-        # Intentar cargar el modelo
-        encoder = get_voice_encoder()
-        if encoder is None:
-            logger.error("❌ No se pudo inicializar el modelo de voz. Verificar los logs para más detalles.")
-        else:
-            logger.info("✅ Modelo de voz inicializado correctamente")
+        # Precarga forzada del modelo con timeout
+        import threading
+        import concurrent.futures
+
+        def load_model_with_timeout():
+            try:
+                # Intentar cargar el modelo
+                encoder = get_voice_encoder()
+                if encoder is None:
+                    logger.error("❌ No se pudo inicializar el modelo de voz.")
+                else:
+                    # Forzar la carga completa con una pequeña operación
+                    dummy_audio = np.zeros(16000)  # 1 segundo de silencio a 16kHz
+                    _ = encoder.embed_utterance(dummy_audio)
+                    logger.error("✅ Modelo de voz inicializado y verificado correctamente")
+                return encoder
+            except Exception as e:
+                logger.error(f"❌ Error al precargar el modelo de voz: {str(e)}")
+                logger.error(traceback.format_exc())
+                return None
+
+        # Usar executor para establecer timeout
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(load_model_with_timeout)
+            try:
+                encoder = future.result(timeout=60)  # 60 segundos de timeout
+                if encoder is None:
+                    logger.error("❌ No se pudo inicializar el modelo de voz dentro del timeout")
+            except concurrent.futures.TimeoutError:
+                logger.error("❌ Timeout al cargar el modelo de voz, continuando sin precarga")
+            
     except Exception as e:
-        logger.error(f"❌ Error al precargar el modelo de voz: {str(e)}")
+        logger.error(f"❌ Error durante la precarga del modelo de voz: {str(e)}")
         logger.error(traceback.format_exc())
-        RESEMBLYZER_AVAILABLE = False  # Desactivar si falló la inicialización
+        # No desactivamos RESEMBLYZER_AVAILABLE aquí, intentaremos cargarlo bajo demanda
 else:
-    logger.warning("⚠️ Resemblyzer no está disponible, no se precargará el modelo de voz")
+    logger.error("⚠️ Resemblyzer no está disponible, no se precargará el modelo de voz")
 
 def preprocess_audio(audio_path):
     """
@@ -902,3 +936,63 @@ async def analyze_voice(
             status_code=500,
             detail="Error al procesar el archivo de voz"
         )
+
+@router.get("/warmup")
+async def warmup():
+    """
+    Endpoint para precalentar el modelo de voz.
+    Útil para forzar la carga del modelo antes de usarlo.
+    """
+    if not RESEMBLYZER_AVAILABLE:
+        return {
+            "status": "error",
+            "message": "Resemblyzer no está disponible",
+            "model_loaded": False
+        }
+    
+    try:
+        start_time = time.time()
+        logger.error("🔥 Iniciando warmup del modelo de voz...")
+        
+        encoder = get_voice_encoder()
+        if encoder is None:
+            logger.error("❌ No se pudo obtener el codificador de voz")
+            return {
+                "status": "error",
+                "message": "No se pudo cargar el modelo de voz",
+                "model_loaded": False
+            }
+        
+        # Verificar que el modelo esté realmente cargado con una operación pequeña
+        logger.error("🔄 Realizando operación de prueba en el modelo...")
+        dummy_audio = np.zeros(16000)  # 1 segundo de silencio a 16kHz
+        embedding = encoder.embed_utterance(dummy_audio)
+        
+        # Verificar el resultado
+        if embedding is None or len(embedding) == 0:
+            logger.error("❌ El modelo devolvió un embedding vacío")
+            return {
+                "status": "error",
+                "message": "El modelo devolvió un embedding vacío",
+                "model_loaded": False
+            }
+        
+        process_time = time.time() - start_time
+        logger.error(f"✅ Warmup completado exitosamente en {process_time:.2f}s")
+        
+        return {
+            "status": "success",
+            "message": f"Modelo precalentado correctamente en {process_time:.2f} segundos",
+            "model_loaded": True
+        }
+    except Exception as e:
+        process_time = time.time() - start_time
+        logger.error(f"❌ Error en el warmup: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        return {
+            "status": "error",
+            "message": f"Error al precalentar el modelo: {str(e)}",
+            "model_loaded": False,
+            "time_elapsed": f"{process_time:.2f}s"
+        }

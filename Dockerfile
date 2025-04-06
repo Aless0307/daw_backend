@@ -36,7 +36,7 @@ EXPOSE ${PORT}
 # Script de inicio
 RUN echo '#!/bin/bash\n\
 echo "Starting server..."\n\
-python -m uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 75' > /app/start.sh && \
+python -m uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 300' > /app/start.sh && \
     chmod +x /app/start.sh
 
 # Configura el comando de inicio

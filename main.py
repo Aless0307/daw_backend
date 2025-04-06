@@ -111,7 +111,7 @@ async def log_requests(request: Request, call_next):
     # Establecer timeout más largo para rutas relacionadas con voz
     timeout = 60  # Default 60 segundos
     if '/voice/' in path or '/login-voice' in path:
-        timeout = 120  # 2 minutos para rutas de voz
+        timeout = 240  # 4 minutos para rutas de voz en lugar de 2
         logger.info(f"⏱️ Timeout extendido a {timeout}s para ruta de voz")
     
     try:
