@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 import time
 import logging
 import os
+import sys
 from config import (
     ALLOWED_ORIGINS,
     PRODUCTION_URL,
@@ -20,21 +21,24 @@ from voice_processing import router as voice_router
 from groq import router as groq_router
 from azure_storage import get_azure_status, verify_azure_storage, reset_connection
 
-# Configurar logger
-logger = logging.getLogger(__name__)
-
-# Configurar logging
+# Configurar logger antes de importar módulos
 logging.basicConfig(
-    level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
+    level=logging.ERROR,  # Forzar nivel ERROR para ver todos los mensajes importantes
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler()
+        logging.StreamHandler(stream=sys.stdout)  # Forzar salida a stdout para Railway
     ]
 )
+logger = logging.getLogger("main")
 
-# Log del entorno actual
-logger.info(f"Iniciando aplicación en entorno: {ENVIRONMENT}")
-logger.info(f"Puerto configurado: {PORT}")
+# Log de información de inicio
+logger.error("=" * 50)
+logger.error("INICIANDO APLICACIÓN EN RAILWAY")
+logger.error(f"Python versión: {sys.version}")
+logger.error(f"Argumentos: {sys.argv}")
+logger.error(f"Directorio de trabajo: {os.getcwd()}")
+logger.error(f"Variables de entorno: RAILWAY_ENVIRONMENT={os.environ.get('RAILWAY_ENVIRONMENT')}")
+logger.error("=" * 50)
 
 app = FastAPI(
     title="DAW Backend API",
@@ -52,35 +56,15 @@ app.add_middleware(
 async def health_check():
     """
     Ruta de healthcheck para Railway.
-    Siempre devuelve 200 OK, pero incluye el estado de los servicios.
+    Siempre devuelve 200 OK sin realizar comprobaciones intensivas.
     """
-    try:
-        # Intentar comprobar servicios básicos sin fallar
-        try:
-            azure_status = get_azure_status()
-        except Exception as e:
-            logger.warning(f"Error al verificar Azure Storage en healthcheck: {str(e)}")
-            azure_status = {"error": str(e)}
-            
-        services_status = {
-            "azure_storage": azure_status,
-            "groq_api": {"available": bool(GROQ_API_KEY)}
-        }
-        
-        return {
-            "status": "healthy",
-            "environment": ENVIRONMENT,
-            "timestamp": time.time(),
-            "services": services_status
-        }
-    except Exception as e:
-        # En caso de cualquier error, aún retornamos 200 OK
-        logger.error(f"Error en healthcheck: {str(e)}")
-        return {
-            "status": "healthy",  # Decimos que es healthy para que Railway no reinicie
-            "warning": "Servicio parcialmente disponible",
-            "timestamp": time.time()
-        }
+    # Para el healthcheck, simplemente devuelve OK sin verificar servicios
+    # para evitar problemas durante el despliegue
+    return {
+        "status": "healthy",
+        "environment": ENVIRONMENT,
+        "timestamp": time.time()
+    }
 
 @app.get("/")
 async def root():

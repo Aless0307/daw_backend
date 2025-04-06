@@ -30,14 +30,18 @@ COPY . .
 # Crea directorios para archivos temporales
 RUN mkdir -p /app/temp_files && chmod 777 /app/temp_files
 
-# Expone el puerto
-EXPOSE ${PORT}
-
-# Script de inicio
+# Script de inicio mejorado
 RUN echo '#!/bin/bash\n\
 echo "Starting server..."\n\
-python -m uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 300' > /app/start.sh && \
-    chmod +x /app/start.sh
+echo "Railway environment: $RAILWAY_ENVIRONMENT"\n\
+echo "Current directory: $PWD"\n\
+echo "Files in directory:"\n\
+ls -la\n\
+python -m uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 300 --log-level debug\n\
+' > /app/start.sh && chmod +x /app/start.sh
+
+# Expone el puerto
+EXPOSE ${PORT}
 
 # Configura el comando de inicio
 CMD ["/app/start.sh"]

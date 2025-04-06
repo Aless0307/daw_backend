@@ -5,13 +5,13 @@ dockerfilePath = "Dockerfile"
 [deploy]
 startCommand = "/app/start.sh"
 healthcheckPath = "/health"
-healthcheckTimeout = 100
+healthcheckTimeout = 180
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3
+restartPolicyMaxRetries = 5
 
 [deploy.healthcheck]
 path = "/health"
-interval = "30s"
-timeout = "10s"
-retries = 3
-initialDelay = "15s" 
+interval = "45s"
+timeout = "30s"
+retries = 5
+initialDelay = "30s" 

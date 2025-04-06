@@ -106,63 +106,50 @@ def get_voice_encoder():
     
     return voice_encoder
 
-# Inicializar el modelo de voz al arrancar
+# Inicializar el modelo de voz al arrancar - modo ligero para no bloquear el arranque
 if RESEMBLYZER_AVAILABLE:
     try:
-        logger.error("🚀 Precargando modelo de codificación de voz...")
-        
-        # Verificar dependencias adicionales
-        try:
-            import torch
-            logger.error(f"✅ PyTorch versión: {torch.__version__}")
-            
-            import pkg_resources
-            resemblyzer_version = pkg_resources.get_distribution("resemblyzer").version
-            logger.error(f"✅ Resemblyzer versión: {resemblyzer_version}")
-            
-            import librosa
-            logger.error(f"✅ Librosa versión: {librosa.__version__}")
-            
-            import soundfile
-            logger.error(f"✅ SoundFile disponible")
-        except Exception as dep_err:
-            logger.error(f"⚠️ Problema con dependencias: {str(dep_err)}")
-        
-        # Precarga forzada del modelo con timeout
+        logger.error("🚀 Configurando inicialización diferida del modelo de voz...")
         import threading
-        import concurrent.futures
-
-        def load_model_with_timeout():
+        
+        # Esta función ejecutará la carga del modelo en segundo plano
+        def load_model_in_background():
             try:
+                logger.error("🧵 Iniciando carga del modelo en hilo secundario...")
+                time.sleep(10)  # Esperar 10 segundos después del arranque para evitar problemas con healthcheck
+                
                 # Intentar cargar el modelo
-                encoder = get_voice_encoder()
-                if encoder is None:
-                    logger.error("❌ No se pudo inicializar el modelo de voz.")
-                else:
-                    # Forzar la carga completa con una pequeña operación
-                    dummy_audio = np.zeros(16000)  # 1 segundo de silencio a 16kHz
-                    _ = encoder.embed_utterance(dummy_audio)
-                    logger.error("✅ Modelo de voz inicializado y verificado correctamente")
-                return encoder
+                import pkg_resources
+                try:
+                    resemblyzer_version = pkg_resources.get_distribution("resemblyzer").version
+                    logger.error(f"📦 Versión de resemblyzer: {resemblyzer_version}")
+                except Exception as ve:
+                    logger.error(f"⚠️ No se pudo determinar la versión de resemblyzer: {str(ve)}")
+                
+                # Cargar el modelo
+                start_time = time.time()
+                global voice_encoder
+                voice_encoder = VoiceEncoder()
+                
+                # Verificar que el modelo realmente esté cargado con una operación pequeña
+                dummy_audio = np.zeros(16000)  # 1 segundo de silencio a 16kHz
+                _ = voice_encoder.embed_utterance(dummy_audio)
+                
+                load_time = time.time() - start_time
+                logger.error(f"✅ Modelo de voz cargado en segundo plano en {load_time:.2f}s")
             except Exception as e:
-                logger.error(f"❌ Error al precargar el modelo de voz: {str(e)}")
+                logger.error(f"❌ Error al cargar el modelo en segundo plano: {str(e)}")
                 logger.error(traceback.format_exc())
-                return None
-
-        # Usar executor para establecer timeout
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(load_model_with_timeout)
-            try:
-                encoder = future.result(timeout=60)  # 60 segundos de timeout
-                if encoder is None:
-                    logger.error("❌ No se pudo inicializar el modelo de voz dentro del timeout")
-            except concurrent.futures.TimeoutError:
-                logger.error("❌ Timeout al cargar el modelo de voz, continuando sin precarga")
-            
+        
+        # Iniciar un hilo para cargar el modelo en segundo plano
+        init_thread = threading.Thread(target=load_model_in_background)
+        init_thread.daemon = True  # El hilo no bloqueará la salida de la aplicación
+        init_thread.start()
+        logger.error("🧵 Inicialización del modelo delegada a un hilo en segundo plano")
+        
     except Exception as e:
-        logger.error(f"❌ Error durante la precarga del modelo de voz: {str(e)}")
+        logger.error(f"❌ Error al configurar la carga en segundo plano: {str(e)}")
         logger.error(traceback.format_exc())
-        # No desactivamos RESEMBLYZER_AVAILABLE aquí, intentaremos cargarlo bajo demanda
 else:
     logger.error("⚠️ Resemblyzer no está disponible, no se precargará el modelo de voz")
 
