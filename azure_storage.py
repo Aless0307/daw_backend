@@ -197,6 +197,7 @@ async def upload_voice_recording(file_path: str, user_email: str) -> str:
             permission=BlobSasPermissions(read=True),
             expiry=datetime.utcnow() + timedelta(days=365)
         )
+
         
         # Construir URL con token SAS
         blob_url = f"https://{blob_service_client.account_name}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/{file_name}?{sas_token}"
@@ -206,6 +207,66 @@ async def upload_voice_recording(file_path: str, user_email: str) -> str:
     except Exception as e:
         logger.error(f"Error al subir archivo a Azure Storage: {str(e)}")
         return None
+
+async def upload_face_photo(file_path: str, user_email: str) -> str:
+    """
+    Sube una foto de rostro a Azure Storage y devuelve la URL de vista previa.
+    
+    Args:
+        file_path: Ruta al archivo de foto
+        user_email: Email del usuario para nombrar el archivo
+        
+    Returns:
+        str: URL de vista previa del archivo con token SAS o None si falla
+    """
+    global is_azure_available
+    
+    # Comprobar disponibilidad de Azure y reintentar si es necesario
+    if not await ensure_azure_storage():
+        logger.error("❌ Azure Storage no está disponible, imposible subir archivo")
+        return None
+    
+    try:
+        # Verificar que el archivo existe
+        if not os.path.exists(file_path):
+            logger.error(f"El archivo {file_path} no existe")
+            return None
+        
+        # Generar nombre único para el archivo
+        file_name = f"faces/{user_email}_{os.path.basename(file_path)}"
+        logger.info(f"Subiendo archivo: {file_name}")
+        
+        # Crear cliente para el blob
+        blob_client = container_client.get_blob_client(file_name)
+        
+        # Subir archivo
+        with open(file_path, "rb") as data:
+            blob_client.upload_blob(data, overwrite=True)
+        
+        logger.info(f"Archivo subido exitosamente: {file_name}")
+        
+        # Generar SAS token para acceso de 1 año
+        sas_token = generate_blob_sas(
+            account_name=blob_service_client.account_name,
+            container_name=AZURE_CONTAINER_NAME,
+            blob_name=file_name,
+            account_key=blob_service_client.credential.account_key,
+            permission=BlobSasPermissions(read=True),
+            expiry=datetime.utcnow() + timedelta(days=365)
+        )
+        
+        # Construir URL con token SAS
+        blob_url = f"https://{blob_service_client.account_name}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/{file_name}?{sas_token}"
+
+        return blob_url
+        
+    except Exception as e:
+        logger.error(f"Error al subir archivo a Azure Storage: {str(e)}")
+        return None
+    
+    
+    
+
 
 async def download_voice_recording(blob_url: str, local_path: str = None) -> str:
     """

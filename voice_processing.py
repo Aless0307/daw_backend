@@ -70,18 +70,18 @@ def get_voice_encoder():
         
     if voice_encoder is None:
         start_time = time.time()
-        logger.error(f"⚠️ Modelo no inicializado, cargando por primera vez en {ENVIRONMENT}...")
+        logger.info(f"⚠️ Modelo no inicializado, cargando por primera vez en {ENVIRONMENT}...")
         try:
             # Intentar obtener la versión de resemblyzer
             try:
                 import pkg_resources
                 resemblyzer_version = pkg_resources.get_distribution("resemblyzer").version
-                logger.error(f"📦 Versión de resemblyzer: {resemblyzer_version}")
+                logger.info(f"📦 Versión de resemblyzer: {resemblyzer_version}")
             except Exception as ve:
-                logger.error(f"⚠️ No se pudo determinar la versión de resemblyzer: {str(ve)}")
+                logger.warning(f"⚠️ No se pudo determinar la versión de resemblyzer: {str(ve)}")
                 
             # Inicializar el codificador
-            logger.error("🔄 Comenzando inicialización del modelo de voz...")
+            logger.info("🔄 Comenzando inicialización del modelo de voz...")
             voice_encoder = VoiceEncoder()
             
             # Verificar que el modelo realmente esté cargado haciendo una operación pequeña
@@ -89,13 +89,13 @@ def get_voice_encoder():
             _ = voice_encoder.embed_utterance(dummy_audio)
             
             load_time = time.time() - start_time
-            logger.error(f"✅ Modelo de voz cargado y verificado en {load_time:.2f} segundos")
+            logger.info(f"✅ Modelo de voz cargado y verificado en {load_time:.2f} segundos")
             
             # Verificar si tiene el método segment_utterance
             if hasattr(voice_encoder, 'segment_utterance'):
-                logger.error("✅ Método segment_utterance disponible")
+                logger.info("✅ Método segment_utterance disponible")
             else:
-                logger.error("⚠️ Método segment_utterance no disponible, se usará embed_utterance directamente")
+                logger.warning("⚠️ Método segment_utterance no disponible, se usará embed_utterance directamente")
                 
         except Exception as e:
             logger.error(f"❌ Error al cargar el modelo de voz: {str(e)}")
@@ -115,16 +115,16 @@ if RESEMBLYZER_AVAILABLE:
         # Esta función ejecutará la carga del modelo en segundo plano
         def load_model_in_background():
             try:
-                logger.error("🧵 Iniciando carga del modelo en hilo secundario...")
+                logger.info("🧵 Iniciando carga del modelo en hilo secundario...")
                 time.sleep(10)  # Esperar 10 segundos después del arranque para evitar problemas con healthcheck
                 
                 # Intentar cargar el modelo
                 import pkg_resources
                 try:
                     resemblyzer_version = pkg_resources.get_distribution("resemblyzer").version
-                    logger.error(f"📦 Versión de resemblyzer: {resemblyzer_version}")
+                    logger.info(f"📦 Versión de resemblyzer: {resemblyzer_version}")
                 except Exception as ve:
-                    logger.error(f"⚠️ No se pudo determinar la versión de resemblyzer: {str(ve)}")
+                    logger.warning(f"⚠️ No se pudo determinar la versión de resemblyzer: {str(ve)}")
                 
                 # Cargar el modelo
                 start_time = time.time()
@@ -136,7 +136,7 @@ if RESEMBLYZER_AVAILABLE:
                 _ = voice_encoder.embed_utterance(dummy_audio)
                 
                 load_time = time.time() - start_time
-                logger.error(f"✅ Modelo de voz cargado en segundo plano en {load_time:.2f}s")
+                logger.info(f"✅ Modelo de voz cargado en segundo plano en {load_time:.2f}s")
             except Exception as e:
                 logger.error(f"❌ Error al cargar el modelo en segundo plano: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -145,7 +145,7 @@ if RESEMBLYZER_AVAILABLE:
         init_thread = threading.Thread(target=load_model_in_background)
         init_thread.daemon = True  # El hilo no bloqueará la salida de la aplicación
         init_thread.start()
-        logger.error("🧵 Inicialización del modelo delegada a un hilo en segundo plano")
+        logger.info("🧵 Inicialización del modelo delegada a un hilo en segundo plano")
         
     except Exception as e:
         logger.error(f"❌ Error al configurar la carga en segundo plano: {str(e)}")
@@ -939,7 +939,7 @@ async def warmup():
     
     try:
         start_time = time.time()
-        logger.error("🔥 Iniciando warmup del modelo de voz...")
+        logger.info("🔥 Iniciando warmup del modelo de voz...")
         
         encoder = get_voice_encoder()
         if encoder is None:
@@ -951,7 +951,7 @@ async def warmup():
             }
         
         # Verificar que el modelo esté realmente cargado con una operación pequeña
-        logger.error("🔄 Realizando operación de prueba en el modelo...")
+        logger.info("🔄 Realizando operación de prueba en el modelo...")
         dummy_audio = np.zeros(16000)  # 1 segundo de silencio a 16kHz
         embedding = encoder.embed_utterance(dummy_audio)
         
@@ -965,7 +965,7 @@ async def warmup():
             }
         
         process_time = time.time() - start_time
-        logger.error(f"✅ Warmup completado exitosamente en {process_time:.2f}s")
+        logger.info(f"✅ Warmup completado exitosamente en {process_time:.2f}s")
         
         return {
             "status": "success",

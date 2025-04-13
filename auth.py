@@ -9,7 +9,7 @@ import os
 from utils.auth_utils import create_access_token, get_current_user
 from mongodb_client import MongoDBClient
 from voice_processing import extract_embedding, compare_voices, verify_voice, preprocess_audio
-from azure_storage import upload_voice_recording, download_voice_recording, ensure_azure_storage
+from azure_storage import upload_voice_recording, download_voice_recording, ensure_azure_storage, upload_face_photo
 from config import (
     SECRET_KEY, 
     ACCESS_TOKEN_EXPIRE_MINUTES, 
@@ -20,6 +20,17 @@ from config import (
 from pydantic import BaseModel
 import librosa
 import numpy as np
+import face_recognition
+import cv2
+import time
+import warnings
+import onnxruntime as ort
+from insightface.app import FaceAnalysis
+import contextlib
+import io
+import requests
+from urllib.parse import urlparse
+import tempfile
 
 # Configurar logging
 logging.basicConfig(
@@ -53,13 +64,95 @@ class LoginResponse(BaseModel):
     username: Optional[str] = None
     email: str
     voice_url: Optional[str] = None
+    face_url: Optional[str] = None
+
+# Suprimir warnings molestos
+warnings.filterwarnings("ignore")
+
+# Silenciar logs internos de onnxruntime
+ort.set_default_logger_severity(3)
+
+# ------------------ PREPROCESAMIENTO ------------------ #
+def preprocess_image(image):
+    height, width = image.shape[:2]
+    max_size = 800
+    if height > max_size or width > max_size:
+        scale = max_size / max(height, width)
+        image = cv2.resize(image, (int(width * scale), int(height * scale)))
+    
+    lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    l = clahe.apply(l)
+    lab = cv2.merge((l, a, b))
+    enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+    
+    return enhanced
+
+# ------------------ ARCFACE COMPARISON ------------------ #
+def compare_faces_arcface(image_path1, image_path2, threshold=0.65):
+    if not os.path.exists(image_path1) or not os.path.exists(image_path2):
+        return "One or both image files do not exist", None, None
+
+    start_time = time.time()
+
+    img1 = cv2.imread(image_path1)
+    img2 = cv2.imread(image_path2)
+
+    if img1 is None or img2 is None:
+        return "Error loading one or both images", None, None
+
+    img1_rgb = cv2.cvtColor(img1, cv2.COLOR_BGR2RGB)
+    img2_rgb = cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
+
+    img1_processed = preprocess_image(img1_rgb)
+    img2_processed = preprocess_image(img2_rgb)
+
+    # Silenciar los prints del modelo durante su inicialización
+    f = io.StringIO()
+    with contextlib.redirect_stdout(f):
+        face_analyzer = FaceAnalysis(providers=['CPUExecutionProvider'])
+        face_analyzer.prepare(ctx_id=0, det_size=(640, 640))
+
+    faces1 = face_analyzer.get(cv2.cvtColor(img1_processed, cv2.COLOR_RGB2BGR))
+    faces2 = face_analyzer.get(cv2.cvtColor(img2_processed, cv2.COLOR_RGB2BGR))
+
+    if not faces1 or not faces2:
+        return "No faces detected in one or both images", None, None
+
+    embedding1 = faces1[0].embedding
+    embedding2 = faces2[0].embedding
+
+    cosine_sim = np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
+    similarity_percentage = cosine_sim * 100
+    match = cosine_sim >= threshold
+
+    execution_time = time.time() - start_time
+
+    return match, similarity_percentage, execution_time
+
+# Función para descargar imagen desde URL
+def download_image(url):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            # Crear un archivo temporal
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
+            temp_file.write(response.content)
+            temp_file.close()
+            return temp_file.name
+        return None
+    except Exception as e:
+        logger.error(f"Error downloading image: {str(e)}")
+        return None
 
 @router.post("/register", response_model=LoginResponse)
 async def register(
     email: str = Form(...),
     username: str = Form(...),
     password: str = Form(...),
-    voice_recording: UploadFile = File(None)
+    voice_recording: UploadFile = File(None),
+    face_photo: UploadFile = File(None)
 ):
     try:
         logger.info(f"Intento de registro para: {email}")
@@ -79,6 +172,7 @@ async def register(
         voice_embeddings = None
         voice_url = None
         temp_file = None
+        face_url = None
         
         if voice_recording:
             logger.info("Procesando grabación de voz")
@@ -125,6 +219,25 @@ async def register(
                         os.remove(temp_file)
                         logger.debug("🧹 Archivo temporal eliminado")
 
+        if face_photo:
+            logger.info("Procesando foto de rostro")
+            # Crear directorio temporal
+            temp_dir = "./temp_files"
+            if not os.path.exists(temp_dir):
+                os.makedirs(temp_dir)
+            image_file = f"{temp_dir}/face.jpg"
+            with open(image_file, "wb") as buffer:
+                content = await face_photo.read()
+                buffer.write(content)
+                logger.info(f"Foto de rostro guardada temporalmente: {image_file}")
+            
+            # Subir a Azure Storage
+            face_url = await upload_face_photo(image_file, email)
+            if not face_url:
+                logger.error("❌ No se pudo subir la foto de rostro a Azure Storage")
+            else:
+                logger.info(f"📤 Foto de rostro subida a Azure. URL: {face_url}")
+            
         # Crear usuario
         logger.info("Creando usuario en MongoDB")
         success = mongo_client.create_user(
@@ -133,7 +246,8 @@ async def register(
             password=hashed_password,  # Usar la contraseña hasheada
             voice_embedding=voice_embedding,
             voice_embeddings=voice_embeddings,
-            voice_url=voice_url
+            voice_url=voice_url,
+            face_url=face_url,
         )
 
         if success:
@@ -145,7 +259,8 @@ async def register(
                 token_type="bearer",
                 username=username,
                 email=email,
-                voice_url=voice_url
+                voice_url=voice_url,
+                face_url=face_url,
             )
         else:
             logger.error(f"❌ Error al crear usuario en la base de datos: {email}")
@@ -347,9 +462,100 @@ async def login_with_voice(
 @router.get("/me", response_model=LoginResponse)
 async def read_users_me(current_user: dict = Depends(get_current_user)):
     return LoginResponse(
-        access_token="",  # No es necesario devolver el token aquí
+        access_token="",
         token_type="bearer",
         username=current_user.get("username"),
         email=current_user["email"],
         voice_url=current_user.get("voice_url")
-    ) 
+    )
+
+@router.post("/login_face", response_model=LoginResponse)
+async def login_face(
+    email: str = Form(...),
+    face_photo: UploadFile = File(...)
+):
+    try:
+        logger.info(f"📸 Intento de login con foto para: {email}")
+        
+        # Verificar tamaño del archivo
+        content = await face_photo.read()
+        if len(content) > 5 * 1024 * 1024:  # 5MB
+            logger.warning(f"❌ Archivo demasiado grande: {len(content)} bytes")
+            raise HTTPException(status_code=400, detail="La foto es demasiado grande (máximo 5MB)")
+            
+        if len(content) == 0:
+            logger.warning("❌ Archivo vacío")
+            raise HTTPException(status_code=400, detail="La foto está vacía")
+        
+        # Buscar usuario por email
+        user = mongo_client.get_user_by_email(email)
+        if not user:
+            logger.warning(f"❌ Usuario no encontrado: {email}")
+            raise HTTPException(status_code=401, detail="Credenciales inválidas")
+
+        # Verificar que el usuario tenga una foto registrada
+        if not user.get('face_url'):
+            logger.warning(f"⚠️ Usuario {email} no tiene foto registrada")
+            raise HTTPException(status_code=400, detail="No hay foto registrada para este usuario")
+
+        logger.info(f"🔍 Face URL del usuario: {user['face_url']}")
+        
+        # Crear directorio temporal
+        temp_dir = "./temp_files"
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+            
+        # Guardar el archivo temporal de la foto recibida
+        temp_file_received = f"{temp_dir}/temp_{face_photo.filename}"
+        with open(temp_file_received, "wb") as buffer:
+            buffer.write(content)
+            logger.info(f"💾 Foto recibida guardada: {temp_file_received} ({len(content)} bytes)")
+
+        # Descargar la foto registrada
+        temp_file_registered = download_image(user['face_url'])
+        if not temp_file_registered:
+            raise HTTPException(status_code=500, detail="Error al descargar la foto registrada")
+
+        logger.info("🔄 Iniciando comparación facial...")
+        
+        # Realizar la comparación facial
+        match, similarity, exec_time = compare_faces_arcface(temp_file_received, temp_file_registered)
+        
+        logger.info(f"📊 Resultados de la comparación:")
+        logger.info(f"   - Coincidencia: {match}")
+        logger.info(f"   - Similitud: {similarity:.2f}%")
+        logger.info(f"   - Tiempo de ejecución: {exec_time:.2f} segundos")
+
+        # Limpiar archivos temporales
+        if os.path.exists(temp_file_received):
+            os.remove(temp_file_received)
+        if os.path.exists(temp_file_registered):
+            os.remove(temp_file_registered)
+            
+        if match:
+            # Generar token de acceso
+            access_token = create_access_token(data={"sub": email})
+            logger.info(f"✅ Login exitoso para: {email}")
+            return LoginResponse(
+                access_token=access_token,
+                token_type="bearer",
+                username=user.get("username"),
+                email=email,
+                voice_url=user.get("voice_url"),
+                face_url=user.get("face_url")
+            )
+        else:
+            logger.warning(f"❌ Autenticación facial fallida para: {email}")
+            raise HTTPException(
+                status_code=401,
+                detail="La autenticación facial falló. Las caras no coinciden."
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error en login con foto: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error al procesar la autenticación por foto"
+        ) 

@@ -47,7 +47,7 @@ class MongoDBClient:
     def get_collection(self, collection_name):
         return self._db[collection_name]
 
-    def create_user(self, username: str, email: str, password: str, voice_embedding: list = None, voice_url: str = None, voice_embeddings: list = None) -> bool:
+    def create_user(self, username: str, email: str, password: str, voice_embedding: list = None, voice_url: str = None, voice_embeddings: list = None, face_url: str = None) -> bool:
         """
         Crea un nuevo usuario en la base de datos
         
@@ -58,6 +58,8 @@ class MongoDBClient:
             voice_embedding: Embedding de voz individual (opcional)
             voice_url: URL del archivo de voz (opcional)
             voice_embeddings: Lista de embeddings de voz (opcional)
+            face_url: URL de la foto de rostro (opcional)
+            face_url_view: URL del visor de la foto de rostro (opcional)
             
         Returns:
             bool: True si el usuario fue creado exitosamente
@@ -84,6 +86,8 @@ class MongoDBClient:
                 user_data["voice_embeddings"] = voice_embeddings
             if voice_url is not None:
                 user_data["voice_url"] = voice_url
+            if face_url is not None:
+                user_data["face_url"] = face_url
             
             # Insertar en la base de datos
             result = self._db.users.insert_one(user_data)
