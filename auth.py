@@ -266,6 +266,7 @@ async def register(
             logger.error(f"❌ Error al crear usuario en la base de datos: {email}")
             raise HTTPException(status_code=500, detail="Error al crear el usuario")
 
+
     except HTTPException:
         raise
     except Exception as e:
