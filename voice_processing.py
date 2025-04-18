@@ -30,6 +30,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Silenciar los logs específicos de Numba y otros módulos ruidosos
+for noisy_logger in ['numba', 'numba.core', 'numba.core.byteflow', 'matplotlib', 'PIL']:
+    logging.getLogger(noisy_logger).setLevel(logging.WARNING)
+
 # Log del entorno actual
 logger.info(f"Ejecutando en entorno: {ENVIRONMENT}")
 
@@ -162,55 +166,303 @@ def preprocess_audio(audio_path):
     4. Estandariza la tasa de muestreo
     """
     try:
-        logger.info(f"Preprocesando audio: {audio_path}")
+        logger.info(f"🔍 INICIO PREPROCESAMIENTO AUDIO: {audio_path}")
         
-        # Cargar audio
+        # Verificar que el archivo existe
+        if not os.path.exists(audio_path):
+            logger.error(f"❌ El archivo {audio_path} no existe")
+            return False
+            
+        # Verificar tamaño del archivo
+        file_size = os.path.getsize(audio_path)
+        logger.info(f"📊 Tamaño del archivo: {file_size/1024:.2f} KB")
+        
+        if file_size == 0:
+            logger.error(f"❌ El archivo {audio_path} está vacío")
+            return False
+        
+        # 1. Cargar audio
+        logger.info(f"🔊 Cargando audio con librosa...")
         audio, sr = librosa.load(audio_path, sr=None)
         
-        # Convertir a mono si es estéreo
-        if len(audio.shape) > 1:
-            audio = librosa.to_mono(audio)
+        logger.info(f"📊 Audio cargado: duración={len(audio)/sr:.2f}s, sr={sr}Hz, forma={audio.shape}, tipo={audio.dtype}")
         
-        # Estandarizar tasa de muestreo a 16000 Hz (óptimo para VoiceEncoder)
+        # Verificar si hay datos de audio
+        if len(audio) == 0:
+            logger.error(f"❌ El archivo de audio está vacío después de cargarlo")
+            return False
+            
+        # Analizar niveles de audio detallados
+        audio_abs = np.abs(audio)
+        audio_max = np.max(audio_abs)
+        audio_mean = np.mean(audio_abs)
+        audio_std = np.std(audio_abs)
+        audio_median = np.median(audio_abs)
+        audio_percentile_25 = np.percentile(audio_abs, 25)
+        audio_percentile_75 = np.percentile(audio_abs, 75)
+        
+        logger.info(f"📊 ANÁLISIS DETALLADO DE AUDIO:")
+        logger.info(f"📊 - Máximo: {audio_max:.6f}")
+        logger.info(f"📊 - Promedio: {audio_mean:.6f}")
+        logger.info(f"📊 - Mediana: {audio_median:.6f}")
+        logger.info(f"📊 - Desviación estándar: {audio_std:.6f}")
+        logger.info(f"📊 - Percentil 25%: {audio_percentile_25:.6f}")
+        logger.info(f"📊 - Percentil 75%: {audio_percentile_75:.6f}")
+        
+        # Analizar silencio - dividir el audio en segmentos y mostrar la energía de cada uno
+        segment_duration = 0.1  # 100ms por segmento
+        segment_samples = int(segment_duration * sr)
+        num_segments = len(audio) // segment_samples
+        
+        logger.info(f"📊 ANÁLISIS DE ENERGÍA POR SEGMENTOS (cada {segment_duration}s):")
+        low_energy_segments = 0
+        high_energy_segments = 0
+        
+        segment_energies = []
+        for i in range(num_segments):
+            start = i * segment_samples
+            end = start + segment_samples
+            segment = audio[start:end]
+            energy = np.mean(np.square(segment))
+            segment_energies.append(energy)
+            
+            if i < 10 or i > num_segments - 5:  # Mostrar los primeros y últimos segmentos
+                logger.info(f"📊 - Segmento {i+1}/{num_segments}: energía={energy:.6f}")
+            elif i == 10:
+                logger.info(f"📊 - ... ({num_segments-15} segmentos más) ...")
+                
+            if energy < 0.0001:  # Umbral arbitrario para "silencio"
+                low_energy_segments += 1
+            else:
+                high_energy_segments += 1
+        
+        if len(segment_energies) > 0:
+            energy_mean = np.mean(segment_energies)
+            energy_std = np.std(segment_energies)
+            energy_max = np.max(segment_energies)
+            logger.info(f"📊 Energía media de segmentos: {energy_mean:.6f}")
+            logger.info(f"📊 Desviación estándar de energía: {energy_std:.6f}")
+            logger.info(f"📊 Energía máxima: {energy_max:.6f}")
+            logger.info(f"📊 Segmentos de baja energía: {low_energy_segments}/{num_segments} ({low_energy_segments/num_segments*100:.1f}%)")
+        
+        if audio_max < 0.01:
+            logger.warning(f"⚠️ Nivel de audio muy bajo: máximo={audio_max:.6f}")
+            logger.warning(f"⚠️ Es posible que este audio no contenga voz audible")
+        
+        # 2. Convertir a mono si es estéreo
+        if len(audio.shape) > 1:
+            logger.info(f"🔊 Convirtiendo audio estéreo a mono...")
+            audio = librosa.to_mono(audio)
+            logger.info(f"✅ Audio convertido a mono: {audio.shape}")
+        
+        # 3. Estandarizar tasa de muestreo a 16000 Hz (óptimo para VoiceEncoder)
         if sr != 16000:
+            logger.info(f"🔊 Remuestreando audio de {sr}Hz a 16000Hz...")
             audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
             sr = 16000
+            logger.info(f"✅ Audio remuestreado: duración={len(audio)/sr:.2f}s")
         
-        # Reducción de ruido
-        audio_denoised = nr.reduce_noise(y=audio, sr=sr)
+        # 4. Guardar una copia del audio original antes del procesamiento
+        orig_path = audio_path + ".original.wav"
+        logger.info(f"💾 Guardando copia del audio original en {orig_path}...")
+        sf.write(orig_path, audio, sr)
+        logger.info(f"✅ Copia original guardada")
         
-        # Normalizar volumen
-        audio_normalized = librosa.util.normalize(audio_denoised)
+        # 5. Reducción de ruido
+        logger.info(f"🔊 Aplicando reducción de ruido...")
+        try:
+            audio_denoised = nr.reduce_noise(y=audio, sr=sr)
+            logger.info(f"✅ Reducción de ruido aplicada")
+            
+            # Verificar si la reducción de ruido fue efectiva
+            if np.array_equal(audio, audio_denoised):
+                logger.warning("⚠️ La reducción de ruido no modificó el audio")
+            else:
+                # Analizar niveles después de reducción de ruido
+                audio_dn_max = np.max(np.abs(audio_denoised))
+                audio_dn_mean = np.mean(np.abs(audio_denoised))
+                audio_dn_median = np.median(np.abs(audio_denoised))
+                logger.info(f"📊 Audio post-reducción: máximo={audio_dn_max:.6f}, promedio={audio_dn_mean:.6f}, mediana={audio_dn_median:.6f}")
+                
+                # Calcular diferencia
+                mean_change = abs(audio_dn_mean - audio_mean) / audio_mean * 100 if audio_mean > 0 else 0
+                logger.info(f"📊 Cambio por reducción de ruido: {mean_change:.2f}%")
+        except Exception as e:
+            logger.error(f"❌ Error en reducción de ruido: {str(e)}")
+            logger.warning("⚠️ Continuando sin reducción de ruido")
+            audio_denoised = audio
         
-        # Guardar audio preprocesado
+        # 6. Normalizar volumen
+        logger.info(f"🔊 Normalizando volumen...")
+        try:
+            audio_normalized = librosa.util.normalize(audio_denoised)
+            logger.info(f"✅ Volumen normalizado")
+            
+            # Analizar niveles después de normalización
+            audio_norm_max = np.max(np.abs(audio_normalized))
+            audio_norm_mean = np.mean(np.abs(audio_normalized))
+            audio_norm_median = np.median(np.abs(audio_normalized))
+            logger.info(f"📊 Audio normalizado: máximo={audio_norm_max:.6f}, promedio={audio_norm_mean:.6f}, mediana={audio_norm_median:.6f}")
+        except Exception as e:
+            logger.error(f"❌ Error en normalización: {str(e)}")
+            logger.warning("⚠️ Continuando sin normalización")
+            audio_normalized = audio_denoised
+        
+        # 7. Guardar audio preprocesado (antes de eliminar silencio)
+        preprocessed_path = audio_path + ".preprocessed.wav"
+        logger.info(f"💾 Guardando audio preprocesado en {preprocessed_path}...")
+        sf.write(preprocessed_path, audio_normalized, sr)
+        logger.info(f"✅ Audio preprocesado guardado")
+        
+        # 8. Guardar audio intermedio para inspección
         sf.write(audio_path, audio_normalized, sr)
         
-        # Detectar y eliminar silencios usando pydub
-        sound = AudioSegment.from_file(audio_path)
-        chunks = split_on_silence(
-            sound,
-            min_silence_len=500,  # mínimo 500ms para considerar silencio
-            silence_thresh=-40,   # umbral para detectar silencio
-            keep_silence=100      # mantener 100ms al inicio y final
-        )
-        
-        if chunks:
-            # Combinar los chunks no silenciosos
-            combined = chunks[0]
-            for chunk in chunks[1:]:
-                combined += chunk
+        # 9. Detectar y eliminar silencios usando pydub
+        logger.info(f"🔊 Iniciando detección de silencio...")
+        try:
+            sound = AudioSegment.from_file(audio_path)
+            logger.info(f"📊 Audio cargado en pydub: duración={sound.duration_seconds:.2f}s, canales={sound.channels}, tasa={sound.frame_rate}Hz, dBFS={sound.dBFS:.2f}dB")
+            
+            # Parámetros de detección de silencio - AJUSTADOS para mejor detección
+            min_silence_len = 300  # ms (reducido para detectar silencios más cortos)
+            silence_thresh = -35   # dB (aumentado para ser menos sensible al ruido de fondo)
+            keep_silence = 50      # ms (reducido para recortar más silencio)
+            
+            # Probar diferentes umbrales para identificar el mejor
+            logger.info(f"🔇 PRUEBA MULTI-UMBRAL DE SILENCIO:")
+            for test_thresh in [-45, -40, -35, -30, -25]:
+                test_chunks = split_on_silence(
+                    sound,
+                    min_silence_len=min_silence_len,
+                    silence_thresh=test_thresh,
+                    keep_silence=keep_silence
+                )
+                logger.info(f"📊 Umbral {test_thresh}dB: encontrados {len(test_chunks)} segmentos de voz")
+            
+            logger.info(f"🔇 USANDO PARÁMETROS FINALES: min_silence_len={min_silence_len}ms, silence_thresh={silence_thresh}dB, keep_silence={keep_silence}ms")
+            
+            # Proceso de división en chunks no silenciosos
+            chunks = split_on_silence(
+                sound,
+                min_silence_len=min_silence_len,
+                silence_thresh=silence_thresh,
+                keep_silence=keep_silence
+            )
+            
+            logger.info(f"🔊 Detección completa: se encontraron {len(chunks)} segmentos de voz")
+            
+            # Si no se detectaron chunks, intentar con un umbral más alto
+            if len(chunks) == 0:
+                logger.warning("⚠️ No se detectaron segmentos de voz con el umbral actual, probando con un umbral más alto")
+                chunks = split_on_silence(
+                    sound,
+                    min_silence_len=min_silence_len,
+                    silence_thresh=-25,  # Umbral más alto (menos negativo) para detectar más audio
+                    keep_silence=keep_silence
+                )
+                logger.info(f"🔊 Nueva detección: se encontraron {len(chunks)} segmentos de voz")
+            
+            # Detallar cada chunk encontrado
+            if chunks:
+                for i, chunk in enumerate(chunks):
+                    chunk_db = chunk.dBFS
+                    chunk_dur = chunk.duration_seconds
+                    logger.info(f"📊 Chunk #{i+1}: duración={chunk_dur:.3f}s, nivel={chunk_db:.2f}dB")
                 
-            # Normalizar volumen nuevamente
-            combined = combined.normalize()
+                # 10. Combinar los chunks no silenciosos
+                logger.info(f"🔊 Combinando {len(chunks)} segmentos de audio...")
+                combined = chunks[0]
+                for chunk in chunks[1:]:
+                    combined += chunk
+                    
+                # 11. Normalizar volumen nuevamente
+                logger.info(f"🔊 Normalizando volumen final...")
+                combined = combined.normalize()
+                
+                # 12. Guardar audio procesado
+                final_path = audio_path + ".final.wav"
+                logger.info(f"💾 Guardando copia del audio final en {final_path}")
+                combined.export(final_path, format="wav")
+                
+                # 13. Guardar audio procesado en la ruta original
+                logger.info(f"💾 Guardando audio procesado en {audio_path}")
+                combined.export(audio_path, format="wav")
+                
+                # Verificar el resultado
+                final_duration = combined.duration_seconds
+                logger.info(f"📊 Audio final: duración={final_duration:.2f}s, nivel={combined.dBFS:.2f}dB")
+                
+                # Verificar que la duración no sea demasiado corta
+                if final_duration < 0.5:
+                    logger.warning(f"⚠️ Audio final muy corto: {final_duration:.2f}s, posible error en detección de silencio")
+                    
+                    # Restaurar audio preprocesado si el audio final es demasiado corto
+                    logger.info("🔄 Restaurando audio preprocesado debido a duración insuficiente")
+                    sound = AudioSegment.from_file(preprocessed_path)
+                    sound.export(audio_path, format="wav")
+                    
+                    logger.info(f"✅ Audio restaurado: duración={sound.duration_seconds:.2f}s")
+                    
+            else:
+                logger.warning("⚠️ No se detectaron segmentos de voz, usando audio completo")
+                # Si no hay chunks, usar el audio preprocesado completo
+                sound = AudioSegment.from_file(preprocessed_path)
+                sound.export(audio_path, format="wav")
+                
+            logger.info(f"✅ Procesamiento de silencio completado correctamente")
             
-            # Guardar audio procesado
-            combined.export(audio_path, format="wav")
+        except Exception as e:
+            logger.error(f"❌ Error en detección de silencio: {str(e)}")
+            logger.error(traceback.format_exc())
+            logger.warning("⚠️ Continuando con el audio preprocesado sin eliminar silencios")
+            # Intentar usar el archivo preprocesado como fallback
+            try:
+                if os.path.exists(preprocessed_path):
+                    sound = AudioSegment.from_file(preprocessed_path)
+                    sound.export(audio_path, format="wav")
+                    logger.info("✅ Se usó el audio preprocesado como fallback")
+            except Exception as e2:
+                logger.error(f"❌ También falló el fallback: {str(e2)}")
+            return True
+        
+        # 14. Verificación final del archivo
+        try:
+            # Cargar el archivo final para verificar que es reproducible
+            final_sound = AudioSegment.from_file(audio_path)
+            final_duration = final_sound.duration_seconds
+            final_level = final_sound.dBFS
             
-        logger.info(f"✅ Audio preprocesado correctamente")
+            logger.info(f"✅ VERIFICACIÓN FINAL: duración={final_duration:.2f}s, nivel={final_level:.2f}dB")
+            
+            if final_duration < 0.3:
+                logger.error(f"❌ Duración final muy corta: {final_duration:.2f}s")
+                if os.path.exists(preprocessed_path):
+                    logger.info("🔄 Restaurando audio preprocesado como último recurso")
+                    backup_sound = AudioSegment.from_file(preprocessed_path)
+                    backup_sound.export(audio_path, format="wav")
+        except Exception as e:
+            logger.error(f"❌ Error en verificación final: {str(e)}")
+        
+        logger.info(f"✅ PREPROCESAMIENTO COMPLETO: {audio_path}")
+        
+        # 15. Verificar el archivo final
+        if os.path.exists(audio_path):
+            final_size = os.path.getsize(audio_path)
+            logger.info(f"📊 Tamaño final: {final_size/1024:.2f} KB")
+            
+            if final_size == 0:
+                logger.error("❌ El archivo final está vacío, restaurando original")
+                if os.path.exists(orig_path):
+                    import shutil
+                    shutil.copy(orig_path, audio_path)
+        else:
+            logger.error("❌ El archivo final no existe, procesamiento fallido")
+            return False
+        
         return True
         
     except Exception as e:
-        logger.error(f"❌ Error al preprocesar audio: {str(e)}")
+        logger.error(f"❌ Error general al preprocesar audio: {str(e)}")
         logger.error(traceback.format_exc())
         return False
 

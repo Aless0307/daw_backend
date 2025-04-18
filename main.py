@@ -18,18 +18,26 @@ from config import (
 )
 from auth import router as auth_router
 from voice_processing import router as voice_router
-from groq import router as groq_router
+from groq_utils import router as groq_router
 from azure_storage import get_azure_status, verify_azure_storage, reset_connection
+from routes import accessibility  # Añadir esta línea
 
 # Configurar logger antes de importar módulos
 logging.basicConfig(
-    level=logging.ERROR,  # Forzar nivel ERROR para ver todos los mensajes importantes
+    level=logging.INFO,  # Usar INFO como nivel base
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(stream=sys.stdout)  # Forzar salida a stdout para Railway
     ]
 )
+
+# Silenciar los logs específicos de Numba y otros módulos ruidosos
+for noisy_logger in ['numba', 'numba.core', 'numba.core.byteflow', 'matplotlib', 'PIL']:
+    logging.getLogger(noisy_logger).setLevel(logging.WARNING)
+
+# Configurar el logger para la aplicación principal
 logger = logging.getLogger("main")
+logger.setLevel(logging.INFO)
 
 # Log de información de inicio
 logger.error("=" * 50)
@@ -51,6 +59,9 @@ app.add_middleware(
     CORSMiddleware,
     **CORS_CONFIG
 )
+
+# Incluir las rutas de accesibilidad
+app.include_router(accessibility.router, prefix="/api", tags=["accessibility"])
 
 @app.get("/health")
 async def health_check():

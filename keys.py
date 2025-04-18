@@ -13,3 +13,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 # Configuración de Azure Storage
 CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=dawproyecto;AccountKey=QwXyZ9K8mN2pL5vR7tY3uB6cE1gH4jM9nP2qS5wD8fA3;EndpointSuffix=core.windows.net"
 NOMBRE_CONTENEDOR = "dawproyecto"
+
+AWS_REGION = 'us-east-1'
+AWS_ACCESS_KEY_ID = "AKIA4ZRCVEKHOAP4AHPY"
+AWS_SECRET_ACCESS_KEY = "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"
+
+# Configuración de Groq
+GROQ_API_KEY = "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"

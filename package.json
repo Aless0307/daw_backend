@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "generate-audio": "python scripts/generate_audio_files.py",
+    "generate-braille-audio": "python scripts/generate_braille_audio.py"
+  }
+} 
