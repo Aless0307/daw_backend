@@ -176,6 +176,8 @@ async def register(
         
         if voice_recording:
             logger.info("Procesando grabación de voz")
+            logger.info(f"Nombre del archivo: {voice_recording.filename}")
+            logger.info(f"Tipo de contenido: {voice_recording.content_type}")
             
             # Verificar disponibilidad de Azure Storage si se va a subir una grabación
             if not await ensure_azure_storage():
@@ -193,11 +195,32 @@ async def register(
                     with open(temp_file, "wb") as buffer:
                         content = await voice_recording.read()
                         if not content:
+                            logger.error("❌ El archivo de voz está vacío")
                             raise HTTPException(status_code=400, detail="El archivo de voz está vacío")
+                        
+                        content_size = len(content)
+                        logger.info(f"Tamaño del contenido: {content_size} bytes")
+                        
                         buffer.write(content)
                         logger.info(f"Archivo de voz guardado temporalmente: {temp_file}")
+                        
+                        # Verificar que el archivo se escribió correctamente
+                        if os.path.exists(temp_file):
+                            file_size = os.path.getsize(temp_file)
+                            logger.info(f"Tamaño del archivo guardado: {file_size} bytes")
+                            if file_size == 0:
+                                logger.error("❌ El archivo guardado está vacío")
+                        else:
+                            logger.error("❌ El archivo no se guardó correctamente")
+                except Exception as e:
+                    logger.error(f"❌ Error al guardar el archivo de voz: {str(e)}")
+                    if temp_file and os.path.exists(temp_file):
+                        os.remove(temp_file)
+                        logger.debug("🧹 Archivo temporal eliminado por error")
+                    raise HTTPException(status_code=500, detail="Error al procesar el archivo de voz")
 
-                    # Extraer embedding
+                # Extraer embedding
+                try:
                     voice_embedding = extract_embedding(temp_file)
                     if voice_embedding is None:
                         logger.warning("⚠️ No se pudo extraer el embedding de la voz. El usuario se registrará sin funcionalidad de voz.")
@@ -214,11 +237,11 @@ async def register(
                         else:
                             logger.info(f"📤 Archivo subido a Azure. URL: {voice_url}")
                 finally:
-                    # Limpiar archivo temporal
+                    # Limpiar archivo temporal después de procesarlo
                     if temp_file and os.path.exists(temp_file):
                         os.remove(temp_file)
-                        logger.debug("🧹 Archivo temporal eliminado")
-
+                        logger.debug("🧹 Archivo temporal eliminado después de procesamiento")
+        
         if face_photo:
             logger.info("Procesando foto de rostro")
             # Crear directorio temporal
@@ -510,7 +533,7 @@ async def login_face(
         temp_file_received = f"{temp_dir}/temp_{face_photo.filename}"
         with open(temp_file_received, "wb") as buffer:
             buffer.write(content)
-            logger.info(f"💾 Foto recibida guardada: {temp_file_received} ({len(content)} bytes)")
+            logger.info(f"Foto recibida guardada: {temp_file_received} ({len(content)} bytes)")
 
         # Descargar la foto registrada
         temp_file_registered = download_image(user['face_url'])
