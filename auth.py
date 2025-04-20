@@ -25,7 +25,7 @@ import cv2
 import time
 import warnings
 import onnxruntime as ort
-from insightface.app import FaceAnalysis
+from face_model import face_analyzer
 import contextlib
 import io
 import requests
@@ -110,9 +110,6 @@ def compare_faces_arcface(image_path1, image_path2, threshold=0.65):
 
     # Silenciar los prints del modelo durante su inicialización
     f = io.StringIO()
-    with contextlib.redirect_stdout(f):
-        face_analyzer = FaceAnalysis(providers=['CPUExecutionProvider'])
-        face_analyzer.prepare(ctx_id=0, det_size=(640, 640))
 
     faces1 = face_analyzer.get(cv2.cvtColor(img1_processed, cv2.COLOR_RGB2BGR))
     faces2 = face_analyzer.get(cv2.cvtColor(img2_processed, cv2.COLOR_RGB2BGR))
@@ -583,3 +580,11 @@ async def login_face(
             status_code=500,
             detail="Error al procesar la autenticación por foto"
         ) 
+    
+# En daw_backend/auth.py o routes/user.py
+@router.get("/user_by_email")
+async def user_by_email(email: str):
+    user = mongo_client.get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return user

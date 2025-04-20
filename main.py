@@ -21,6 +21,7 @@ from voice_processing import router as voice_router
 from groq_utils import router as groq_router
 from azure_storage import get_azure_status, verify_azure_storage, reset_connection
 from routes import accessibility  # Añadir esta línea
+from insightface.app import FaceAnalysis
 
 # Configurar logger antes de importar módulos
 logging.basicConfig(
@@ -206,6 +207,8 @@ async def reset_azure():
     return {
         "message": "Conexión a Azure Storage reiniciada correctamente"
     }
+
+
 
 if __name__ == "__main__":
     import uvicorn

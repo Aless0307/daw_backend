@@ -1,0 +1,22 @@
+{
+    "sourceFile": "face_model.py",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 1,
+            "patches": [
+                {
+                    "date": 1745111085897,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1745111106961,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -7,4 +7,5 @@\n f = io.StringIO()\n with contextlib.redirect_stdout(f):\n     face_analyzer = FaceAnalysis(providers=['CPUExecutionProvider'])\n     face_analyzer.prepare(ctx_id=0, det_size=(640, 640))\n+print(\"Modelo de reconocimiento facial cargado exitosamente\")\n\\ No newline at end of file\n"
+                }
+            ],
+            "date": 1745111085897,
+            "name": "Commit-0",
+            "content": "# daw_backend/face_model.py\nimport contextlib\nimport io\nfrom insightface.app import FaceAnalysis\n\n# Silenciar salida\nf = io.StringIO()\nwith contextlib.redirect_stdout(f):\n    face_analyzer = FaceAnalysis(providers=['CPUExecutionProvider'])\n    face_analyzer.prepare(ctx_id=0, det_size=(640, 640))\n"
+        }
+    ]
+}
