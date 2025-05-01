@@ -1,0 +1,18 @@
+{
+    "sourceFile": "config.py",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1746119133239,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1746119133239,
+            "name": "Commit-0",
+            "content": "import os\nfrom dotenv import load_dotenv\nimport logging\nimport secrets\nfrom datetime import timedelta\n\n# Cargar variables de entorno\nload_dotenv()\n\n# Configuración de logging\n# Configurar nivel de logging para pymongo\nlogging.getLogger(\"pymongo\").setLevel(logging.WARNING)\nlogging.getLogger(\"azure\").setLevel(logging.WARNING)\n\n# Detección del entorno\ndef get_environment():\n    \"\"\"\n    Detecta el entorno actual de la aplicación.\n    Returns:\n        str: 'production' si está en Railway, 'development' si está en local\n    \"\"\"\n    railway_env = os.getenv(\"RAILWAY_ENVIRONMENT\")\n    if railway_env == \"production\":\n        return \"production\"\n    return \"development\"\n\n# Detección del entorno\nENVIRONMENT = get_environment()\nIS_PRODUCTION = ENVIRONMENT == \"production\"\n\n# Obtener el puerto de Railway o usar el default\nPORT = int(os.getenv(\"PORT\", \"8000\"))\n\n# Generar SECRET_KEY si no existe\ndef generate_secret_key():\n    \"\"\"Genera una clave secreta segura\"\"\"\n    return secrets.token_hex(32)\n\n# Configuración de JWT\nSECRET_KEY = os.getenv(\"SECRET_KEY\", generate_secret_key())\nALGORITHM = \"HS256\"\nACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv(\"ACCESS_TOKEN_EXPIRE_MINUTES\", \"30\"))\n\n# Configuración de voz\nVOICE_SIMILARITY_THRESHOLD = float(os.getenv(\"VOICE_SIMILARITY_THRESHOLD\", \"0.85\"))\n\n# Configuración de Azure Storage\nAZURE_STORAGE_CONNECTION_STRING = \"DefaultEndpointsProtocol=https;AccountName=proyectodawalessandro;AccountKey=+5u3MzkDsZRqx84xI+RzFiZxz6LT0wAK1WYfGB3UrOc3AcRFVLqErikBH7KyWauwpSsVYMXPveXI+AStTv5FmA==;EndpointSuffix=core.windows.net\"\nAZURE_CONTAINER_NAME = os.getenv(\"AZURE_CONTAINER_NAME\", \"daw\")\n\n# Configuración de URLs\nFRONTEND_URL = os.getenv(\"FRONTEND_URL\", \"https://daw-frontend.vercel.app\")\nPRODUCTION_URL = os.getenv(\"PRODUCTION_URL\", f\"https://dawbackend-production.up.railway.app\")\n\n# Configuración de CORS\nALLOWED_ORIGINS = [\n    FRONTEND_URL,\n    PRODUCTION_URL,\n    \"http://localhost:5173\",\n    \"http://localhost:8000\",\n    \"http://localhost:8003\"\n    #\"*\"  # Permitir todos los orígenes en desarrollo\n] if not IS_PRODUCTION else [\n    FRONTEND_URL,\n    PRODUCTION_URL\n]\n\n# Configuración adicional de CORS\nCORS_CONFIG = {\n    \"allow_origins\": ALLOWED_ORIGINS,\n    \"allow_credentials\": True,\n    \"allow_methods\": [\"*\"],\n    \"allow_headers\": [\"*\"],\n}\n\n# Clave de API de GROQ\nDEFAULT_GROQ_KEY = \"gsk_4RYbYJGYvZrYjKx8W9NpQsTuVwXyZaAbBcCdEfGhIjKlMnOpQr\"\nGROQ_API_KEY = os.getenv(\"GROQ_API_KEY\", DEFAULT_GROQ_KEY)\n\n# Configuración de timeouts\nREQUEST_TIMEOUT = int(os.getenv(\"REQUEST_TIMEOUT\", \"30\"))\n\n# Configuración de logging\nlogging.basicConfig(\n    level=logging.INFO if IS_PRODUCTION else logging.DEBUG,\n    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',\n    handlers=[\n        logging.StreamHandler()\n    ]\n)\nlogger = logging.getLogger(__name__)\n\n# Log de configuración\nlogger.info(f\"Entorno: {ENVIRONMENT}\")\nlogger.info(f\"Puerto: {PORT}\")\nlogger.info(f\"Frontend URL: {FRONTEND_URL}\")\nlogger.info(f\"Production URL: {PRODUCTION_URL}\")\nlogger.info(f\"CORS permitidos: {ALLOWED_ORIGINS}\")\n\nlogger.info(\"Configuración final cargada correctamente\")"
+        }
+    ]
+}

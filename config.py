@@ -58,8 +58,8 @@ ALLOWED_ORIGINS = [
     PRODUCTION_URL,
     "http://localhost:5173",
     "http://localhost:8000",
-    "http://localhost:8003",
-    "*"  # Permitir todos los orígenes en desarrollo
+    "http://localhost:8003"
+    #"*"  # Permitir todos los orígenes en desarrollo
 ] if not IS_PRODUCTION else [
     FRONTEND_URL,
     PRODUCTION_URL
