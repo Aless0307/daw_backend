@@ -44,22 +44,27 @@ from urllib.parse import urlparse
 import tempfile
 import traceback # Para imprimir stack trace en errores
 
+# importar el router para los ejercicios
+from routers.logic import router as logic_router
+##################################################
+
 # Configurar logging
 logging.basicConfig(
     level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('auth.log') # Considera usar logging.FileHandler con un path absoluto o relativo seguro
+        logging.FileHandler('auth.log')
     ]
 )
 logger = logging.getLogger(__name__)
 
-# Log del entorno actual
+# Log del entorno actual para saber si estaba en desarrollo o en railway
 logger.info(f"Ejecutando en entorno: {ENVIRONMENT}")
 
 router = APIRouter()
 mongo_client = MongoDBClient()
+router.include_router(logic_router, prefix="/api") #añadimos el router para los ejercicios
 
 # ----- Configurar CORS (Asegúrate de que ALLOWED_ORIGINS no contenga "*" si allow_credentials es True) -----
 CORS_CONFIG = {

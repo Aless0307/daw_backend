@@ -1,9 +1,11 @@
+import datetime
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
 import logging
 from keys import MONGODB_URI, DATABASE_NAME
 from typing import Optional
 from config import VOICE_SIMILARITY_THRESHOLD
+from bson import ObjectId # Importar ObjectId
 
 # Configurar logging
 logging.basicConfig(
@@ -20,7 +22,7 @@ class MongoDBClient:
     _instance = None
     _client = None
     _db = None
-
+    
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(MongoDBClient, cls).__new__(cls)
@@ -29,7 +31,7 @@ class MongoDBClient:
 
     def _connect(self):
         try:
-            self._client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+            self._client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=15000) #lo aumento para el wifi del houtel
             self._db = self._client[DATABASE_NAME]
             # Verificar la conexión
             self._client.server_info()
@@ -327,3 +329,169 @@ class MongoDBClient:
         except Exception as e:
             logger.error(f"Error al obtener datos de voz para {email}: {str(e)}")
             return None 
+        
+        # Tu get_current_user retorna el dict completo, lo cual es bueno, pero tener get_user_by_id puede ser útil.
+    def get_user_by_id(self, user_id: ObjectId) -> Optional[dict]:
+         """Obtiene un usuario por su ObjectId."""
+         try:
+             logger.debug(f"Buscando usuario por ID: {user_id}")
+             user = self._db.users.find_one({"_id": user_id})
+             # No loguear el usuario completo por seguridad
+             if user:
+                 logger.debug(f"Usuario encontrado por ID: {user_id}")
+             else:
+                 logger.debug(f"Usuario no encontrado por ID: {user_id}")
+             return user
+         except Exception as e:
+             logger.error(f"Error al buscar usuario por ID {user_id}: {str(e)}")
+             return None
+
+
+    # --- NUEVOS MÉTODOS PARA LA LÓGICA ---
+
+    def get_random_unsolved_problem(self, user_id: ObjectId, difficulty: Optional[str] = None) -> Optional[dict]:
+        """
+        Busca un problema aleatorio que el usuario no haya resuelto, opcionalmente filtrado por dificultad.
+
+        Args:
+            user_id: El ObjectId del usuario.
+            difficulty: Dificultad del problema a buscar (ej. "basico", "intermedio", "avanzado").
+
+        Returns:
+            dict: Un documento de problema (con _id, text, difficulty) o None si no hay problemas sin resolver.
+        """
+        try:
+            # --- Añadir Logging de entrada ---
+            logger.info(f"[{user_id}] Inicio get_random_unsolved_problem. Dificultad solicitada: {difficulty}")
+
+            # 1. Obtener los IDs de los problemas que el usuario ya resolvió
+            user_doc = self._db.users.find_one(
+                {"_id": user_id},
+                {"ejercicios": 1} # Solo necesitamos el array de ejercicios resueltos
+            )
+            solved_problem_ids = []
+            if user_doc and user_doc.get("ejercicios"):
+                solved_problem_ids = [
+                    exercise["problem_id"]
+                    for exercise in user_doc["ejercicios"]
+                    if isinstance(exercise, dict) and "problem_id" in exercise and isinstance(exercise["problem_id"], ObjectId)
+                    # Asegurarse de que es un dict y tiene un problem_id que es un ObjectId
+                ]
+            # --- Añadir Logging de IDs resueltos ---
+            logger.debug(f"[{user_id}] Problemas resueltos encontrados: {len(solved_problem_ids)} IDs")
+            if solved_problem_ids:
+                # Loguear solo algunos IDs si la lista es muy larga
+                    logger.debug(f"[{user_id}] Primeros 5 IDs resueltos: {solved_problem_ids[:5]}")
+
+
+            # 2. Construir el filtro para la colección de problemas
+            problem_filter = {}
+            if difficulty:
+                problem_filter["difficulty"] = difficulty
+
+            # Excluir los problemas que ya ha resuelto el usuario
+            # La condición es: "_id no debe estar en la lista de solved_problem_ids"
+            problem_filter["_id"] = {"$nin": solved_problem_ids}
+
+            # --- Añadir Logging del filtro ---
+            logger.debug(f"[{user_id}] Filtro final para la colección 'ejercicios': {problem_filter}")
+
+
+            # 3. Buscar un problema aleatorio que coincida con el filtro
+            # Usar el pipeline de agregación con $sample para obtener un documento aleatorio
+            pipeline = [
+                {"$match": problem_filter},
+                {"$sample": {"size": 1}} # Obtener 1 documento aleatorio del resultado del $match
+                # Opcional: Añadir un $project si quieres limitar los campos devueltos
+                # {"$project": {"text": 1, "difficulty": 1, "topics": 1}}
+            ]
+
+            # Ejecutar la agregación en la colección de problemas (ejercicios)
+            problem_collection = self._db.ejercicios # Asumiendo que la colección de problemas se llama 'ejercicios'
+
+            # --- Añadir Logging del pipeline ---
+            logger.debug(f"[{user_id}] Pipeline de agregación: {pipeline}")
+
+            result = list(problem_collection.aggregate(pipeline))
+
+            # --- Añadir Logging del resultado de la agregación ---
+            logger.debug(f"[{user_id}] Resultado de la agregación: {result}")
+
+
+            if result:
+                logger.info(f"[{user_id}] Problema sin resolver encontrado: {result[0].get('_id')} (Dificultad: {result[0].get('difficulty')})")
+                # Devolver el primer (y único) documento del resultado de $sample
+                return result[0]
+            else:
+                # Este es el caso que te está ocurriendo
+                logger.warning(f"[{user_id}] No se encontraron problemas sin resolver con el filtro especificado. El resultado de la agregación está vacío.")
+                return None # No hay problemas que coincidan con los criterios y no estén resueltos
+
+        except Exception as e:
+            # --- Añadir Logging de error ---
+            logger.error(f"[{user_id}] ERROR en get_random_unsolved_problem: {str(e)}", exc_info=True) # exc_info=True para stack trace
+            # Dependiendo de tu estrategia de manejo de errores, podrías relanzar
+            # raise # Si quieres que el error llegue al cliente como 500
+            return None # Si prefieres que el endpoint retorne None o un mensaje amigable
+
+    def add_solved_exercise(self, user_id: ObjectId, exercise_data: dict) -> Optional[object]: # Cambiado tipo de retorno
+        """
+        Añade un ejercicio resuelto al array 'ejercicios' del usuario.
+        Devuelve el objeto UpdateResult de pymongo o None en caso de error.
+        """
+        try:
+            logger.info(f"Añadiendo ejercicio resuelto para user_id: {user_id}")
+            if not isinstance(exercise_data.get("problem_id"), ObjectId):
+                 logger.error(f"exercise_data: 'problem_id' debe ser ObjectId.")
+                 return None # Devolver None en error de validación
+            if not exercise_data.get("problem_difficulty"):
+                 logger.error("exercise_data: 'problem_difficulty' requerido.")
+                 return None # Devolver None en error de validación
+
+            # --- CORRECCIÓN VALIDACIÓN TIMESTAMP ---
+            # Validar timestamp de forma más simple y segura
+            ts = exercise_data.get("timestamp")
+            if ts is not None and not isinstance(ts, datetime):
+                 logger.warning(f"'timestamp' en exercise_data no es datetime: {type(ts)}. Se espera datetime o None.")
+                 # Podrías decidir quitarlo o convertirlo si es posible, o simplemente loguear.
+                 # Por ahora, solo logueamos la advertencia.
+            # --- FIN CORRECCIÓN ---
+
+            # --- CORRECCIÓN VALOR DE RETORNO ---
+            # Ejecutar update y DEVOLVER el resultado directamente
+            result = self._db.users.update_one(
+                {"_id": user_id},
+                {"$push": {"ejercicios": exercise_data}}
+            )
+            # Ya no retornamos True/False, retornamos el objeto 'result'
+            return result
+            # --- FIN CORRECCIÓN ---
+
+        except Exception as e:
+            logger.error(f"Error al añadir ejercicio resuelto para user_id {user_id}: {str(e)}")
+            return None # Devolver None en caso de excepción de DB
+        
+
+    def get_problem_by_id(self, problem_id: ObjectId) -> dict | None:
+        """Busca un problema por su ObjectId en la colección 'ejercicios'."""
+        # Acceder a la colección a través de self._db
+        collection_name = 'ejercicios' # Nombre de la colección de problemas
+        if self._db is None:
+             logger.error(f"MongoDBClient: La conexión a la base de datos (self._db) no está disponible al buscar problema {problem_id}.")
+             return None
+
+        logger.info(f"MONGO_CLIENT: Buscando problema con _id: {problem_id} en colección '{collection_name}'")
+        try:
+            # --- CORRECCIÓN: Usar self._db['nombre_coleccion'] ---
+            problem_collection = self._db[collection_name]
+            problem = problem_collection.find_one({"_id": problem_id})
+            # --- FIN CORRECCIÓN ---
+
+            if problem:
+                 logger.info(f"MONGO_CLIENT: Problema encontrado para ID {problem_id}")
+            else:
+                 logger.warning(f"MONGO_CLIENT: Problema con _id {problem_id} no encontrado en la colección '{collection_name}'.")
+            return problem # Devuelve el documento (dict) o None
+        except Exception as e:
+             logger.error(f"MONGO_CLIENT: Error en get_problem_by_id buscando ID {problem_id}: {e}", exc_info=True)
+             return None # Devuelve None en caso de error de DB
