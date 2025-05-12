@@ -17,13 +17,8 @@ from mongodb_client import MongoDBClient
 # Importa tu dependencia de autenticación
 from utils.auth_utils import get_current_user
 
-# Importa los modelos/schemas Pydantic
-# Necesitas el modelo FeedbackResponse para la respuesta
 from models.logic import UserProgressResponse, DifficultyProgress, ProblemResponse, NoProblemResponse, FeedbackResponse, TTSTextRequest # Asegúrate de que FeedbackResponse esté en models.logic
-# Si no tienes FeedbackResponse, defínelo en models/logic.py:
-# class FeedbackResponse(BaseModel):
-#    analysis: str
-#    grade: int # O float, según lo que devuelva tu LLM
+
 from google.oauth2 import service_account # Asegúrate de que esto esté importado
 
 import logging
@@ -80,17 +75,10 @@ tts_client = None # Inicializar a None
 # Aseguramos que la variable credentials también se inicialice a None aquí
 credentials = None
 try:
-    # --- Cargar credenciales desde el archivo ---
-    # Esto requiere que el archivo sea válido y la librería google-auth esté instalada.
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_KEY_PATH)
 
-    # --- AÑADIR ESTE LOG DESPUÉS DE CARGAR CREDENCIALES ---
-    # Verifica si la carga devolvió el objeto esperado
     logger.info(f"Credenciales cargadas desde archivo type: {type(credentials)}, value: {credentials}")
     # ----------------------------------------------------
-
-    # --- Inicializar el cliente Google Cloud TTS usando las credenciales ---
-    # ¡¡CORRECCIÓN!! Pasar la variable 'credentials' (el objeto), NO la ruta string.
     tts_client = texttospeech.TextToSpeechClient(credentials=credentials) # <-- ¡¡PASAR LA VARIABLE credentials!!
 
     logger.info(f"Cliente Google Cloud Text-to-Speech inicializado usando archivo explícito: {SERVICE_ACCOUNT_KEY_PATH}")
@@ -106,7 +94,6 @@ except Exception as e:
     tts_client = None
     credentials = None
 
-# --- AÑADIR ESTE LOG DESPUÉS DEL BLOQUE TRY/EXCEPT (PARA VER ESTADO FINAL) ---
 logger.info(f"Estado final de tts_client después de la inicialización del módulo: {type(tts_client)}")
 # ---------------------------------------------------
 
@@ -118,14 +105,11 @@ logger.info(f"Estado final de tts_client después de la inicialización del mód
     summary="Obtiene el progreso del usuario autenticado"
 )
 async def get_user_progress(
-    # current_user ya es el diccionario del usuario de la DB
     current_db_user: Annotated[dict, Depends(get_current_user)]
 ):
     if mongo_client is None:
          raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Servicio de base de datos no disponible.")
 
-    # Ya tenemos el documento del usuario gracias a Depends(get_current_user)
-    # No necesitamos obtenerlo de nuevo por ID a menos que necesitemos una versión más reciente (poco probable aquí)
     user_id = current_db_user.get("_id"); user_email = current_db_user.get("email", "N/A")
 
     if not user_id or not isinstance(user_id, ObjectId):
@@ -175,8 +159,6 @@ async def get_logic_problem(
     logger.info(f"Buscando problema user_id: {user_id}, dificultad: {difficulty or 'cualquiera'}")
 
     try:
-        # Asegúrate de que get_random_unsolved_problem es síncrono o usa async db driver (Motor)
-        # Si es síncrono (PyMongo), usa asyncio.to_thread
         problem_dict = await asyncio.to_thread(mongo_client.get_random_unsolved_problem, user_id, difficulty=difficulty)
 
     except Exception as db_error:
@@ -323,19 +305,27 @@ async def submit_user_answer(
     # --- Construir el prompt ---
     # Este prompt es CRUCIAL para guiar al LLM. Adapta el texto según el modelo LLM que uses.
     llm_prompt_parts = [
-        "SYSTEM: You are a programming logic tutor, friendly and helpful, specialized in assisting blind users learning to program. Your feedback should focus on the logical steps, problem-solving approach, correctness, and efficiency, not specific code syntax. Provide a clear analysis and assign a grade.",
-        "CONTEXT: This is an educational web application for blind individuals. Interaction is primarily through voice. Your response will be read aloud by a screen reader.",
-        f"USER_PROGRESS_SUMMARY: This user has solved {total_solved_count} exercises so far.", # Puedes añadir más detalles aquí si los calculaste
-        f"PROGRAMMING_LOGIC_PROBLEM: {problem_data['text']}", # El enunciado original del problema
-        f"USER_SUBMITTED_SOLUTION_LOGIC: {user_answer}", # La respuesta transcrita del usuario
-        "INSTRUCTIONS: Based on the PROGRAMMING_LOGIC_PROBLEM and the USER_SUBMITTED_SOLUTION_LOGIC:",
-        "- Analyze the user's proposed logic and thought process. Is it a valid approach to solve the problem?",
-        "- Comment on its correctness, clarity, and potential efficiency. Discuss edge cases if relevant to the problem.",
-        "- Do NOT provide code snippets or specific code syntax in your analysis.",
-        "- Provide detailed feedback (aim for 50-200 words, keep it concise but informative for voice).",
-        "- Assign a grade for the solution's logic on a scale of 0 to 10, where 0 is completely incorrect/no attempt, and 10 is excellent.",
-        "- Respond ONLY in JSON format with the keys 'analysis' (string) and 'grade' (integer 0-10). Ensure the JSON is valid.",
-        "EXAMPLE_JSON_RESPONSE: {\"analysis\": \"Your approach is logical and correct...\", \"grade\": 8}"
+        "SISTEMA: Eres un tutor de lógica de programación, amigable y servicial, especializado en ayudar a usuarios ciegos que están aprendiendo a programar. Tu retroalimentación debe centrarse en los pasos lógicos, el enfoque de resolución de problemas, la corrección y la eficiencia, no en la sintaxis específica del código. Proporciona un análisis claro y asigna una calificación.",
+        "CONTEXTO: Esta es una aplicación web educativa para personas ciegas. La interacción es principalmente a través de la voz. Tu respuesta será leída en voz alta por un lector de pantalla.",
+        f"RESUMEN_PROGRESO_USUARIO: Este usuario ha resuelto {total_solved_count} ejercicios hasta ahora.", # Puedes añadir más detalles aquí si los calculaste
+        f"PROBLEMA_LOGICA_PROGRAMACION: {problem_data['text']}", # El enunciado original del problema
+        f"LOGICA_SOLUCION_ENVIADA_USUARIO: {user_answer}", # La respuesta transcrita del usuario
+        "INSTRUCCIONES: Basándote en el PROBLEMA_LOGICA_PROGRAMACION y la LOGICA_SOLUCION_ENVIADA_USUARIO:",
+        "- Analiza la lógica y el proceso de pensamiento propuestos por el usuario. ¿Es un enfoque válido para resolver el problema?",
+        "- Comenta sobre su corrección, claridad y eficiencia potencial. Discute casos límite si son relevantes para el problema.",
+        "- NO proporciones fragmentos de código ni sintaxis de código específica en tu análisis.",
+        "- trata de escribirlo correctamente para que el text to speech lo lea bien, ya que si pones simbolos o caracteres raros, el lector de pantalla no lo leerá bien y puede confundir al usuario ciego.",
+        "- no seas muy estricto, pero si hazle saber si se equivocó o faltó información.",
+        "- Proporciona retroalimentación detallada (apunta a 20-200 palabras, mantenla concisa pero informativa para la voz).",
+        "- El usuario es ciego, por ende no esperes que te brinde código o pseudocódigo, sino una explicación de su razonamiento. Sólo evalúa la lógica de su respuesta, no la sintaxis.",
+        "- no uses el símbolo '' para indicar comillas, ya que el lector de pantalla no lo leerá bien.",
+        "- El speech to text entiende ford en vez de for, entonces cuando te diga ford, entiende que es for.",
+        "- No utilices comillas simples ni dobles, ya que el lector de pantalla no lo leerá bien.",
+        "- Si vas a brindar ejemplos con símvolos así como * - / + - =, adapta el contenido para que el lector de pantalla lo lea bien, usa palabras en vez de ciertos símbolos, los que consideres que el tts, no leerá bien, piensa la respuesta que darás, ya que todas serán procesadas con él lector de pantalla.",
+        "- Asigna una calificación para la lógica de la solución en una escala de 0 a 10, donde 0 es completamente incorrecto/sin intento, y 10 es excelente.",
+        "- Responde ÚNICAMENTE en formato JSON con las claves 'analysis' (cadena de texto) y 'grade' (entero de 0 a 10). Asegúrate de que el JSON sea válido.",
+        # Mantuve el contenido del análisis en inglés como ejemplo, pero tu LLM debería generarlo en español
+        "EXAMPLE_JSON_RESPONSE: {\"analysis\": \"Your approach is logical and correct... but could be more efficient by...\", \"grade\": 8}"
     ]
     llm_prompt = "\n".join(llm_prompt_parts)
 
@@ -349,8 +339,8 @@ async def submit_user_answer(
             # La función get_gemini_feedback debe estar implementada en utils/gemini_utils.py
             # y ser ASYNC (def async) para usar await aquí.
             # Si es SÍNCRONA, usa: feedback_result = await asyncio.to_thread(get_gemini_feedback, ...)
-            feedback_result = await get_gemini_feedback(problem_data['text'], user_answer, user_progress_summary=llm_prompt_parts[2]) # Pasar el prompt completo o solo la parte del progreso si la función lo acepta
-
+            feedback_result = await get_gemini_feedback(problem_data['text'], user_answer)
+            
 
             if feedback_result and isinstance(feedback_result, dict): # Verificar que sea un diccionario
                 llm_analysis = feedback_result.get("analysis", "Error al extraer análisis del resultado de IA.")
